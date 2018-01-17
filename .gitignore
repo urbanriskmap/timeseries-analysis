@@ -1,5 +1,5 @@
 _python/
 
 #for vim
-.swp
-.swo
+*.swp
+*.swo

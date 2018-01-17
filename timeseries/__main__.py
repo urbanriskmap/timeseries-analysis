@@ -17,6 +17,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import datetime
+import streaming_peak_finder as alg
 from sqlalchemy import create_engine
 
 #From: https://matplotlib.org/users/event_handling.html
@@ -37,14 +38,54 @@ def onpick(event):
 #takes in a dataframe with index 'date' and column 'count'
 #returns the CUSUM at every index 'date'
 def gen_CUSUM(series, expected_mean=0):
-    ret = pd.DataFrame(series)
+    #todo: do this in place, just adding a column so we don't have to get a deep copy
+    ret = series.copy(deep=True)
     sumSoFar = 0
     for index, row in series.iterrows():
         sumSoFar += row['count'] - expected_mean
-        ret[index] = sumSoFar
+        ret.loc[index]['count'] = sumSoFar
     return ret
 
 
+def get_data(start_date, end_date, interval):
+    """ Gets data from sql database between start_date and end_date
+    Args: 
+        start_date (str): the start date and time as a ISO8601 string
+        end_date (str):  the end date and time as an ISO8601 string
+        interval (str): a postgresql interval string
+
+    Returns: 
+        Pandas dataframe, with the index being a date and the 'count' column 
+        saying how many flood reports were received on that interval
+        Zero values are included for intervals that do not have any reports
+    """
+    num_reports_with_zeros = pd.read_sql_query('''
+        SELECT date, COALESCE(count, NULL, 0) as count FROM 
+		(SELECT date_trunc('hour', offs) as date FROM 
+			generate_series(
+                            %(start_date)s,
+                            %(end_date)s,
+                            '2017-02-10 00:00:35.630000-05:00'::timestamptz, 
+			    '2017-02-27 00:00:35.630000-05:00'::timestamptz,
+			    '1 hour'::interval) as offs ORDER BY date ASC) empty_hours
+        LEFT JOIN 
+                (select date_trunc('hour', created_at), count(pkey) 
+                   from archive.reports 
+                     WHERE text  NOT SIMILAR To '%%(T|t)(E|e)(S|s)(T|t)%%' 
+                     GROUP BY date_trunc('hour', created_at)
+                   ) no_test 
+                   ON date = date_trunc
+    ''', params={"start_date":start_date, "end_date":end_date}, con=engine, index_col="date")
+
+    return num_reports_with_zeros
+
+def test_harness(alg, known_flooding, flood_reports):
+    """ Plays each flood report in turn to the streaming algorithm, creating an animation
+    Args: 
+        alg: the streaming algorithm class. Has a input_report() function that takes in a report
+            input_report returns
+    
+    """
 
 def scatterPlot():
     engine = create_engine("postgresql://postgres:postgres@localhost:5432/petabencana")
@@ -58,7 +99,7 @@ def scatterPlot():
                     AND report_data->>'flood_depth' IS NOT NULL
                     AND (report_data->>'flood_depth')::int != 50::int
                     AND text NOT SIMILAR TO '%%test%%'
-                    AND database_time > '2012-02-18 01:00:35.630000-05:00'
+                    AND database_time > '2017-02-18 01:00:35.630000-05:00'
                     AND database_time < '2017-02-23 01:00:35.630000-05:00'
                 ORDER BY database_time ASC
             LIMIT ''' + str(limit), con=engine, index_col="created_at")
@@ -101,9 +142,10 @@ def scatterPlot():
     num_reports_with_zeros = pd.read_sql_query('''
         SELECT date, COALESCE(count, NULL, 0) as count FROM 
 		(SELECT date_trunc('hour', offs) as date FROM 
-			generate_series('2014-12-29 01:00:35.630000-05:00'::timestamp, 
-			'2018-01-20 01:00:35.630000-05:00'::timestamp,
-			'1 hour'::interval) as offs ORDER BY date ASC) empty_hours
+			generate_series(
+                            '2017-02-10 00:00:35.630000-05:00'::timestamptz, 
+			    '2017-02-27 00:00:35.630000-05:00'::timestamptz,
+			    '1 hour'::interval) as offs ORDER BY date ASC) empty_hours
         LEFT JOIN 
                 (select date_trunc('hour', created_at), count(pkey) 
                    from archive.reports 
@@ -117,7 +159,6 @@ def scatterPlot():
     
     print(df.shape)
 
-    #
     # for non heavy flooding 
     #		generate_series('2014-12-29 01:00:35.630000-05:00'::timestamp, 
     #		'2015-01-20 01:00:35.630000-05:00'::timestamp,
@@ -125,8 +166,13 @@ def scatterPlot():
     #0.4227586389603458
     #mean
     #0.14177693761814744
-    mu = 0.14177693761814744
-    sigma = 0.4227586389603458
+    #mu = 0.14177693761814744
+    #sigma = 0.4227586389603458
+
+    # 2017-02-10 
+    # 2017-02-17
+    mu = 1.4497041420118344
+    sigma = 2.4444086893395007
 
     std_dev = num_reports_with_zeros.std()["count"]
     mean = num_reports_with_zeros.mean()["count"]
@@ -141,16 +187,18 @@ def scatterPlot():
     print(std_error)
 
     CUSUM = gen_CUSUM(num_reports_with_zeros, mu)
+    print(CUSUM)
 
     fig, ax = plt.subplots()
 
     cid = fig.canvas.callbacks.connect('pick_event', onpick)
 
-    ax.axhline(y=mean, color='r')
-    ax.axhline(y=mean+3*std_error, color='r')
-    ax.axhline(y=mean-3*std_error, color='r')
-    ax.scatter(df.index.values, df['flood_depth'])
-    ax.plot(CUSUM, color='orange')
+    #ax.axhline(y=mean, color='r')
+    #ax.axhline(y=mean+3*std_error, color='r')
+    #ax.axhline(y=mean-3*std_error, color='r')
+    #ax.scatter(df.index.values, df['flood_depth'])
+    ax.axhline(y=mu+3*sigma, color='r')
+    ax.plot(CUSUM.index.values, CUSUM['count'], color='orange')
     ax.scatter(num_reports_with_zeros.index.values, num_reports_with_zeros['count'], color='g')
     plt.show()
 
