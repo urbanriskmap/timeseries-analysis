@@ -1,3 +1,6 @@
+
+import pandas as pd
+
 class streaming_peak_finder:
     def __init__(self, window_size, threshhold):
         """ Creates a streaming peak finder
@@ -17,7 +20,7 @@ class streaming_peak_finder:
         Args: 
             report (timeSeries): 
                 index:
-                dateTime | count
+                name | count
 
         Returns:
             tuple(mean, median, std_deviation)
@@ -28,11 +31,16 @@ class streaming_peak_finder:
 
         self.data_in_moving_window.append(report)
         if len(self.data_in_moving_window) > self.window_size:
-            self.data_in_moving_window.pop()
+            self.data_in_moving_window.pop(0)
 
-        mean = self.
+        temp = pd.Series(self.data_in_moving_window)
 
+        #mean = self.data_in_moving_window.mean()
+        #median = self.data_in_moving_window.median()
+        #std = self.data_in_moving_window.std()
 
+        mean = temp.mean()
+        median = temp.median()
+        std = temp.std()
 
-        pass
-
+        return (mean, median, std)

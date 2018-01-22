@@ -16,9 +16,14 @@ __url__ = "https://github.com/urbanriskmap/timeseries-analysis"
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation
+
 import datetime
-import streaming_peak_finder as alg
+import streaming_peak_finder as spf
 from sqlalchemy import create_engine
+
+global engine
+engine = create_engine("postgresql://postgres:postgres@localhost:5432/petabencana")
 
 #From: https://matplotlib.org/users/event_handling.html
 def onclick(event):
@@ -38,7 +43,7 @@ def onpick(event):
 #takes in a dataframe with index 'date' and column 'count'
 #returns the CUSUM at every index 'date'
 def gen_CUSUM(series, expected_mean=0):
-    #todo: do this in place, just adding a column so we don't have to get a deep copy
+    #TODO: do this in place, just adding a column so we don't have to get a deep copy
     ret = series.copy(deep=True)
     sumSoFar = 0
     for index, row in series.iterrows():
@@ -46,6 +51,39 @@ def gen_CUSUM(series, expected_mean=0):
         ret.loc[index]['count'] = sumSoFar
     return ret
 
+
+def get_data_bin_by_minute(start_date, end_date, interval):
+    """ Gets data from sql database between start_date and end_date
+    Args: 
+        start_date (str): the start date and time as a ISO8601 string
+        end_date (str):  the end date and time as an ISO8601 string
+        interval (str): a postgresql interval string
+
+    Returns: 
+        Pandas dataframe, with the index being a date and the 'count' column 
+        saying how many flood reports were received on that interval
+        Zero values are included for intervals that do not have any reports
+    """
+    date_trunc_to = "minute"
+
+    num_reports_with_zeros = pd.read_sql_query('''
+        SELECT date, COALESCE(count, NULL, 0) as count FROM 
+                (SELECT date_trunc(%(date_trunc_to)s, offs) as date FROM 
+        		generate_series(
+                            %(start_date)s::timestamptz,
+                            %(end_date)s::timestamptz,
+                            %(interval)s::interval
+        		    ) as offs ORDER BY date ASC) empty_hours
+        LEFT JOIN 
+                (select date_trunc(%(date_trunc_to)s, created_at), count(pkey) 
+                   from archive.reports 
+                     WHERE text  NOT SIMILAR To '%%(T|t)(E|e)(S|s)(T|t)%%' 
+                     GROUP BY date_trunc(%(date_trunc_to)s, created_at)
+                   ) no_test 
+                   ON date = date_trunc
+    ''', params={"start_date":start_date, "end_date":end_date, "interval":interval, "date_trunc_to":date_trunc_to}, con=engine, index_col="date", parse_dates=["date"])
+
+    return num_reports_with_zeros
 
 def get_data(start_date, end_date, interval):
     """ Gets data from sql database between start_date and end_date
@@ -63,11 +101,10 @@ def get_data(start_date, end_date, interval):
         SELECT date, COALESCE(count, NULL, 0) as count FROM 
 		(SELECT date_trunc('hour', offs) as date FROM 
 			generate_series(
-                            %(start_date)s,
-                            %(end_date)s,
-                            '2017-02-10 00:00:35.630000-05:00'::timestamptz, 
-			    '2017-02-27 00:00:35.630000-05:00'::timestamptz,
-			    '1 hour'::interval) as offs ORDER BY date ASC) empty_hours
+                            %(start_date)s::timestamptz,
+                            %(end_date)s::timestamptz,
+                            %(interval)s::interval
+			    ) as offs ORDER BY date ASC) empty_hours
         LEFT JOIN 
                 (select date_trunc('hour', created_at), count(pkey) 
                    from archive.reports 
@@ -75,8 +112,7 @@ def get_data(start_date, end_date, interval):
                      GROUP BY date_trunc('hour', created_at)
                    ) no_test 
                    ON date = date_trunc
-    ''', params={"start_date":start_date, "end_date":end_date}, con=engine, index_col="date")
-
+    ''', params={"start_date":start_date, "end_date":end_date, "interval":interval}, con=engine, index_col="date", parse_dates=["date"])
     return num_reports_with_zeros
 
 def test_harness(alg, known_flooding, flood_reports):
@@ -84,12 +120,53 @@ def test_harness(alg, known_flooding, flood_reports):
     Args: 
         alg: the streaming algorithm class. Has a input_report() function that takes in a report
             input_report returns
-    
+
+        known_flooding: 
+            pd dataframe that has all reports during known flooding in a continuous interval
+
+        flood_reports: 
+            All flood reports within the continuous interval. Also includes known_flooding reports
+
+    Returns: 
+        None, displays the graph of the alg over the interval
     """
+    print("shape")
+    print(flood_reports.shape)
+
+    t = pd.DataFrame(index=flood_reports.index)
+
+    for index, row in flood_reports.itertuples(name=None):
+        (mean, median, std) = alg.input_report(row)
+        t.loc[index, 'mean'] = mean
+        t.loc[index, 'median'] = median
+        t.loc[index, 'std'] = std
+        
+
+
+    print(t)
+    fig, ax = plt.subplots()
+    ax.set_xlim(t.index.values[0], t.index.values[-1])
+    ax.plot(t.index.values, t['mean'], color='g', alpha=0.5, label="mean")
+    #ax.plot(t.index.values, t['median'], color='b', alpha=0.5, label="median")
+    ax.scatter(flood_reports.index.values, flood_reports['count'], color='k', alpha=0.5)
+    ax.legend()
+
+    def update(frame):
+        ax.set_xlabel(t.index.values[frame])
+        ax.plot(t.index.values[0:frame], t[0:frame]['mean'], color='g', alpha=0.5, label="mean")
+        ax.plot(t.index.values[0:frame], t[0:frame]['std'], color='r', alpha=0.5, label="std")
+        ax.scatter(flood_reports.index.values[0:frame], flood_reports.iloc[0:frame]['count'], color='k', alpha=0.5)
+        return ax
+
+    anim = FuncAnimation(fig, update, frames=np.arange(0,flood_reports.shape[0]), interval=50)
+    plt.show()
+    #anim.save('../bin_by_hour.gif', writer='imagemagick', fps=60)
+
+
+
+    return
 
 def scatterPlot():
-    engine = create_engine("postgresql://postgres:postgres@localhost:5432/petabencana")
-    
     limit = 3000
     
     df = pd.read_sql_query('''
@@ -203,4 +280,20 @@ def scatterPlot():
     plt.show()
 
 if __name__ == "__main__":
-    scatterPlot()
+    #scatterPlot()
+    alg = spf.streaming_peak_finder(10, 1)
+    start = "'2017-02-20 00:00:35.630000-05:00'"
+    end = "'2017-02-23 00:00:35.630000-05:00'"
+    interval = "'1 minute'"
+    known = get_data_bin_by_minute( start, end, interval)
+
+    start_all_reports = "'2017-02-10 00:00:35.630000-05:00'"
+    end_all_reports = "'2017-02-27 00:00:35.630000-05:00'"
+    reports = get_data_bin_by_minute( start_all_reports, end_all_reports, interval) 
+
+    #fig, ax = plt.subplots()
+    #ax.scatter(known.index.values, known['count'], alpha=0.5)
+    #ax.scatter(reports.index.values, reports['count'], color='g', alpha=0.5)
+    #plt.show()
+
+    test_harness(alg, known, reports)
