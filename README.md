@@ -11,3 +11,13 @@ source _python/bin/activate
 pip install -r requirements/dev.txt
 pip install -r requirements/common.txt
 ```
+
+In order to make gifs, install imagemagick 
+```
+brew install imagemagick 
+```
+or 
+
+```
+sudo apt-get install imagemagick 
+```
