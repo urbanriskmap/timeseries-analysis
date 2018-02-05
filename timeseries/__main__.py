@@ -53,7 +53,7 @@ def gen_CUSUM(series, expected_mean=0):
 
 def stats_between_dates(start, end, bin_by_hour=True):
     t = get_data(start, end)
-    return t.mean()
+    return (t.mean()['count'], t.median()['count'], t.std()['count'])
 
 def get_data_bin_by_minute(start_date, end_date, interval="'1 minute'"):
     """ Gets data from sql database between start_date and end_date
@@ -364,7 +364,7 @@ def cusum_bin_by_min():
     #alg = spf.streaming_peak_finder(10, 1)
     #test_harness(alg, known, reports)
     from CUSUM import streaming_peak_finder_cusum
-    mu = stats_between_dates(start_all_reports, start_known_flood)['count']
+    mu = stats_between_dates(start_all_reports, start_known_flood)[0]
     alg = streaming_peak_finder_cusum(10, 1, mu=mu)
     test_harness_cusum(alg, known, reports)
 
@@ -383,9 +383,9 @@ def cusum_bin_by_hour():
     #alg = spf.streaming_peak_finder(10, 1)
     #test_harness(alg, known, reports)
     from CUSUM import streaming_peak_finder_cusum
-    mu = stats_between_dates(start_all_reports, start_known_flood)['count']
+    mu = stats_between_dates(start_all_reports, start_known_flood)[0]
     alg = streaming_peak_finder_cusum(10, 1, mu=mu)
-    test_harness_cusum(alg, known, reports, filename="./graphs/bin_by_hour_jbd_feb_cusum.gif", animate=True)
+    test_harness_cusum(alg, known, reports, filename="./graphs/bin_by_hour_jbd_feb_cusum.png", animate=False)
 
 def moving_average_bin_by_hour():
     start_known_flood = "'2017-02-20 00:00:35.630000-05:00'"
@@ -411,14 +411,31 @@ def moving_average_bin_by_minute():
     end_all_reports = "'2017-02-27 00:00:35.630000-05:00'"
     reports = get_data_bin_by_minute( start_all_reports, end_all_reports) 
 
-    alg = spf.streaming_peak_finder(20, 7)
+    alg = spf.streaming_peak_finder(40, 1.7)
     test_harness(alg, known, reports, filename="./graphs/moving_avg_bin_by_minute.png")
+
+
+def moving_average_bin_by_hour_2016():
+    start_known_flood = "'2016-02-25 00:00:35.630000-05:00'"
+    end = "'2016-02-27 00:00:35.630000-05:00'"
+    known = get_data( start_known_flood, end)
+
+    start_all_reports = "'2016-02-10 00:00:35.630000-05:00'"
+    end_all_reports = "'2016-02-28 00:00:35.630000-05:00'"
+    reports = get_data( start_all_reports, end_all_reports) 
+
+    stats = stats_between_dates(start_all_reports, start_known_flood)
+    stdDev = stats[2]
+    print(stats)
+    alg = spf.streaming_peak_finder(10, stdDev*2)
+    test_harness(alg, known, reports, filename="./graphs/moving_avg_bin_by_hour_feb_2016_jbd.png")
 
 if __name__ == "__main__":
     #cusum_bin_by_min()
     #cusum_bin_by_hour()
     #moving_average_bin_by_hour()
-    moving_average_bin_by_minute()
+    moving_average_bin_by_hour_2016()
+    #moving_average_bin_by_minute()
 
 
 
