@@ -51,8 +51,11 @@ def gen_CUSUM(series, expected_mean=0):
         ret.loc[index]['count'] = sumSoFar
     return ret
 
+def stats_between_dates(start, end, bin_by_hour=True):
+    t = get_data(start, end)
+    return t.mean()
 
-def get_data_bin_by_minute(start_date, end_date, interval):
+def get_data_bin_by_minute(start_date, end_date, interval="'1 minute'"):
     """ Gets data from sql database between start_date and end_date
     Args: 
         start_date (str): the start date and time as a ISO8601 string
@@ -85,7 +88,7 @@ def get_data_bin_by_minute(start_date, end_date, interval):
 
     return num_reports_with_zeros
 
-def get_data(start_date, end_date, interval):
+def get_data(start_date, end_date, interval="'1 hour'"):
     """ Gets data from sql database between start_date and end_date
     Args: 
         start_date (str): the start date and time as a ISO8601 string
@@ -115,7 +118,7 @@ def get_data(start_date, end_date, interval):
     ''', params={"start_date":start_date, "end_date":end_date, "interval":interval}, con=engine, index_col="date", parse_dates=["date"])
     return num_reports_with_zeros
 
-def test_harness(alg, known_flooding, flood_reports):
+def test_harness(alg, known_flooding, flood_reports, filename="./graphs/temp.png", animate=False):
     """ Plays each flood report in turn to the streaming algorithm, creating an animation
     Args: 
         alg: the streaming algorithm class. Has a input_report() function that takes in a report
@@ -136,35 +139,101 @@ def test_harness(alg, known_flooding, flood_reports):
     t = pd.DataFrame(index=flood_reports.index)
 
     for index, row in flood_reports.itertuples(name=None):
-        (mean, median, std) = alg.input_report(row)
+        (mean, median, std, signal) = alg.input_report(row)
         t.loc[index, 'mean'] = mean
         t.loc[index, 'median'] = median
         t.loc[index, 'std'] = std
-        
+        t.loc[index, 'signal'] = signal
 
-
-    print(t)
-    fig, ax = plt.subplots()
+    fig, (ax, ax1) = plt.subplots(2,1)
     ax.set_xlim(t.index.values[0], t.index.values[-1])
-    ax.plot(t.index.values, t['mean'], color='g', alpha=0.5, label="mean")
     #ax.plot(t.index.values, t['median'], color='b', alpha=0.5, label="median")
     ax.scatter(flood_reports.index.values, flood_reports['count'], color='k', alpha=0.5)
     ax.legend()
 
-    def update(frame):
-        ax.set_xlabel(t.index.values[frame])
-        ax.plot(t.index.values[0:frame], t[0:frame]['mean'], color='g', alpha=0.5, label="mean")
-        ax.plot(t.index.values[0:frame], t[0:frame]['std'], color='r', alpha=0.5, label="std")
-        ax.scatter(flood_reports.index.values[0:frame], flood_reports.iloc[0:frame]['count'], color='k', alpha=0.5)
-        return ax
 
-    anim = FuncAnimation(fig, update, frames=np.arange(0,flood_reports.shape[0]), interval=50)
+
+    if (animate):
+        def update(frame):
+            ax.set_xlabel(t.index.values[frame])
+            ax.plot(t.index.values[0:frame], t[0:frame]['mean'], color='g', alpha=0.5, label="mean")
+            ax.plot(t.index.values[0:frame], t[0:frame]['median'], color='g', alpha=0.5, label="median")
+            ax.plot(t.index.values[0:frame], t[0:frame]['std'], color='g', alpha=0.5, label="std")
+            ax.scatter(flood_reports.index.values[0:frame], flood_reports.iloc[0:frame]['count'], color='k', alpha=0.5)
+            return ax
+
+        anim = FuncAnimation(fig, update, frames=np.arange(0,flood_reports.shape[0]), interval=1)
+        if (filename[-3:] == "gif"):
+            anim.save(filename, writer='imagemagick', fps=60)
+        return
+        #anim.save('./graphs/bin_by_hour_jbd_feb_cusum_mu1-44.gif', writer='imagemagick', fps=60)
+        #anim.save('./graphs/bin_by_min_jbd_feb_cusum_mu1-44.gif', writer='imagemagick', fps=60)
+    else: 
+        ax.plot(t.index.values, t['mean'], color='g', alpha=0.5, label="mean")
+        ax1.plot(t.index.values, t['signal'], color='r', alpha=0.5, label="signal")
+        if (filename):
+            plt.savefig(filename)
+            print("Saving image " + filename)
+
     plt.show()
-    #anim.save('../bin_by_hour.gif', writer='imagemagick', fps=60)
-
-
-
     return
+
+def test_harness_cusum(alg, known_flooding, flood_reports, filename="./graphs/temp.png", animate=False):
+    """ Plays each flood report in turn to the streaming algorithm, creating an animation
+    Args: 
+        alg: the streaming algorithm class. Has a input_report() function that takes in a report
+            input_report returns
+
+        known_flooding: 
+            pd dataframe that has all reports during known flooding in a continuous interval
+
+        flood_reports: 
+            All flood reports within the continuous interval. Also includes known_flooding reports
+
+    Returns: 
+        a Pandas dataframe with the same index as flood_reports and 
+        None, displays the graph of the alg over the interval
+    """
+    print("shape")
+    print(flood_reports.shape)
+    t = pd.DataFrame(index=flood_reports.index)
+
+    for index, row in flood_reports.itertuples(name=None):
+        (cusum,signal) = alg.input_report(row)
+        t.loc[index, 'cusum'] = cusum
+        t.loc[index, 'signal'] = signal
+
+    fig, ax = plt.subplots()
+    ax.set_xlim(t.index.values[0], t.index.values[-1])
+    ax.scatter(flood_reports.index.values, flood_reports['count'], color='k', alpha=0.5)
+    ax.legend()
+
+    if (animate):
+        def update(frame):
+            ax.set_xlabel(t.index.values[frame])
+            ax.plot(t.index.values[0:frame], t[0:frame]['cusum'], color='g', alpha=0.5, label="mean")
+            ax.scatter(flood_reports.index.values[0:frame], flood_reports.iloc[0:frame]['count'], color='k', alpha=0.5)
+            return ax
+
+        anim = FuncAnimation(fig, update, frames=np.arange(0,flood_reports.shape[0]), interval=1)
+        if (filename[-3:] == "gif"):
+            anim.save(filename, writer='imagemagick', fps=60)
+        return
+        #anim.save('./graphs/bin_by_hour_jbd_feb_cusum_mu1-44.gif', writer='imagemagick', fps=60)
+        #anim.save('./graphs/bin_by_min_jbd_feb_cusum_mu1-44.gif', writer='imagemagick', fps=60)
+    else: 
+        ax.plot(t.index.values, t, color='g', alpha=0.5, label="cusum")
+        if (filename):
+            plt.savefig(filename)
+
+    plt.show()
+    return
+
+def basic_score(known_flooding, flood_reports, signal_from_alg):
+    '''
+    Gives a numerical score based on known flooding vs. signal from streaming alg
+
+    '''
 
 def scatterPlot():
     limit = 3000
@@ -279,21 +348,77 @@ def scatterPlot():
     ax.scatter(num_reports_with_zeros.index.values, num_reports_with_zeros['count'], color='g')
     plt.show()
 
-if __name__ == "__main__":
-    #scatterPlot()
-    alg = spf.streaming_peak_finder(10, 1)
-    start = "'2017-02-20 00:00:35.630000-05:00'"
+#convenience methods
+def cusum_bin_by_min():
+    start_known_flood = "'2017-02-20 00:00:35.630000-05:00'"
     end = "'2017-02-23 00:00:35.630000-05:00'"
-    interval = "'1 minute'"
-    known = get_data_bin_by_minute( start, end, interval)
+    interval = "'1 hour'"
+    #known = get_data( start_known_flood, end, interval)
+    known = get_data_bin_by_minute( start_known_flood, end)
 
     start_all_reports = "'2017-02-10 00:00:35.630000-05:00'"
     end_all_reports = "'2017-02-27 00:00:35.630000-05:00'"
-    reports = get_data_bin_by_minute( start_all_reports, end_all_reports, interval) 
+    #reports = get_data( start_all_reports, end_all_reports, interval) 
+    reports = get_data_bin_by_minute( start_all_reports, end_all_reports) 
 
-    #fig, ax = plt.subplots()
-    #ax.scatter(known.index.values, known['count'], alpha=0.5)
-    #ax.scatter(reports.index.values, reports['count'], color='g', alpha=0.5)
-    #plt.show()
+    #alg = spf.streaming_peak_finder(10, 1)
+    #test_harness(alg, known, reports)
+    from CUSUM import streaming_peak_finder_cusum
+    mu = stats_between_dates(start_all_reports, start_known_flood)['count']
+    alg = streaming_peak_finder_cusum(10, 1, mu=mu)
+    test_harness_cusum(alg, known, reports)
 
-    test_harness(alg, known, reports)
+def cusum_bin_by_hour():
+    start_known_flood = "'2017-02-20 00:00:35.630000-05:00'"
+    end = "'2017-02-23 00:00:35.630000-05:00'"
+    interval = "'1 hour'"
+    #known = get_data( start_known_flood, end, interval)
+    known = get_data( start_known_flood, end)
+
+    start_all_reports = "'2017-02-10 00:00:35.630000-05:00'"
+    end_all_reports = "'2017-02-27 00:00:35.630000-05:00'"
+    #reports = get_data( start_all_reports, end_all_reports, interval) 
+    reports = get_data( start_all_reports, end_all_reports) 
+
+    #alg = spf.streaming_peak_finder(10, 1)
+    #test_harness(alg, known, reports)
+    from CUSUM import streaming_peak_finder_cusum
+    mu = stats_between_dates(start_all_reports, start_known_flood)['count']
+    alg = streaming_peak_finder_cusum(10, 1, mu=mu)
+    test_harness_cusum(alg, known, reports, filename="./graphs/bin_by_hour_jbd_feb_cusum.gif", animate=True)
+
+def moving_average_bin_by_hour():
+    start_known_flood = "'2017-02-20 00:00:35.630000-05:00'"
+    end = "'2017-02-23 00:00:35.630000-05:00'"
+    interval = "'1 hour'"
+    #known = get_data( start_known_flood, end, interval)
+    known = get_data( start_known_flood, end)
+
+    start_all_reports = "'2017-02-10 00:00:35.630000-05:00'"
+    end_all_reports = "'2017-02-27 00:00:35.630000-05:00'"
+    #reports = get_data( start_all_reports, end_all_reports, interval) 
+    reports = get_data( start_all_reports, end_all_reports) 
+
+    alg = spf.streaming_peak_finder(10, 40)
+    test_harness(alg, known, reports, filename="./graphs/moving_avg_bin_by_hour_feb_jbd.png")
+
+def moving_average_bin_by_minute():
+    start_known_flood = "'2017-02-20 00:00:35.630000-05:00'"
+    end = "'2017-02-23 00:00:35.630000-05:00'"
+    known = get_data_bin_by_minute( start_known_flood, end)
+
+    start_all_reports = "'2017-02-10 00:00:35.630000-05:00'"
+    end_all_reports = "'2017-02-27 00:00:35.630000-05:00'"
+    reports = get_data_bin_by_minute( start_all_reports, end_all_reports) 
+
+    alg = spf.streaming_peak_finder(20, 7)
+    test_harness(alg, known, reports, filename="./graphs/moving_avg_bin_by_minute.png")
+
+if __name__ == "__main__":
+    #cusum_bin_by_min()
+    #cusum_bin_by_hour()
+    #moving_average_bin_by_hour()
+    moving_average_bin_by_minute()
+
+
+
