@@ -11,6 +11,8 @@ class streaming_peak_finder:
             A new streaming_peak_finder object.
 
         """
+        self.big_window = []
+        self.big_window_size = window_size*10
         self.data_in_moving_window = []
         self.window_size = window_size
         self.threshold = threshold
@@ -35,6 +37,10 @@ class streaming_peak_finder:
         if len(self.data_in_moving_window) > self.window_size:
             self.data_in_moving_window.pop(0)
 
+        self.big_window.append(report)
+        if len(self.big_window) > self.big_window_size:
+            self.big_window.pop(0)
+
         temp = pd.Series(self.data_in_moving_window)
 
         #mean = self.data_in_moving_window.mean()
@@ -44,6 +50,9 @@ class streaming_peak_finder:
         mean = temp.mean()
         median = temp.median()
         std = temp.std()
-        signal = mean > self.threshold
 
-        return (mean, median, std, signal)
+        otherStd = pd.Series(self.big_window).std()
+        signal = mean > self.threshold
+        #signal = mean > otherStd*3
+
+        return (mean, median, otherStd, signal)
