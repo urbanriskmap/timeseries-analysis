@@ -4,3 +4,6 @@ _python/
 #for vim
 *.swp
 *.swo
+
+# don't include image folder, it is huge
+/image_recognition/img/*

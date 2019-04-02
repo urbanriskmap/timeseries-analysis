@@ -16,6 +16,7 @@ __url__ = "https://github.com/urbanriskmap/timeseries-analysis"
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib as mpl
 from matplotlib.animation import FuncAnimation
 
 import datetime
@@ -148,7 +149,7 @@ def get_data_chennai(start_date, end_date, interval="'1 hour'"):
     ''', params={"start_date":start_date, "end_date":end_date, "interval":interval}, con=engine, index_col="date", parse_dates=["date"])
     return num_reports_with_zeros
 
-def test_harness(alg, known_flooding, flood_reports, filename="./graphs/temp.png", animate=False):
+def test_harness(alg, known_flooding, flood_reports, filename="./graphs/temp.png", animate=False, show=True):
     """ Plays each flood report in turn to the streaming algorithm, creating an animation
     Args: 
         alg: the streaming algorithm class. Has a input_report() function that takes in a report
@@ -181,26 +182,37 @@ def test_harness(alg, known_flooding, flood_reports, filename="./graphs/temp.png
     fig.suptitle('', fontsize=16)
     ax.set_xlim(t.index.values[0], t.index.values[-1])
     #ax.plot(t.index.values, t['median'], color='b', alpha=0.5, label="median")
+    fig.canvas.draw()
+    xlabels = [item.get_text()[5:] for item in ax1.get_xticklabels()]
+    ax1.set_xticklabels(xlabels)
+
 
     if (animate):
         def update(frame):
-            ax.set_xlabel(t.index.values[frame])
+            date = t.index.values[frame]
+            ts = pd.to_datetime(str(date)) 
+            d = ts.strftime('%Y.%m.%d - %H:00')
+            #ax.set_xlabel(t.index.values[frame])
+            ax.set_xlabel(d)
             ax.plot(t.index.values[0:frame], t[0:frame]['mean'], color='g', alpha=0.5, label="mean")
             #ax.plot(t.index.values[0:frame], t[0:frame]['median'], color='b', alpha=0.5, label="median")
             #ax.plot(t.index.values[0:frame], t[0:frame]['std'], color='r', alpha=0.5, label="std")
-            ax.scatter(flood_reports.index.values[0:frame], flood_reports.iloc[0:frame]['count'], color='k', alpha=0.5)
+            ax.scatter(flood_reports.index.values[0:frame], flood_reports.iloc[0:frame]['count'], color='k', alpha=0.5, s=5)
             ax1.plot(t.index.values[0:frame], t[0:frame]['signal'], color='r', alpha=0.5, label="signal")
+
             return ax
 
         anim = FuncAnimation(fig, update, frames=np.arange(0,flood_reports.shape[0]), interval=1)
         ax.legend()
         if (filename and filename[-3:] == "gif"):
-            anim.save(filename, writer='imagemagick', fps=60)
+            print(mpl.rcParams['savefig.dpi'])
+            anim.save(filename, writer='imagemagick', fps=60, bitrate=4118620, dpi=200)
         #anim.save('./graphs/bin_by_hour_jbd_feb_cusum_mu1-44.gif', writer='imagemagick', fps=60)
         #anim.save('./graphs/bin_by_min_jbd_feb_cusum_mu1-44.gif', writer='imagemagick', fps=60)
     else: 
         ax.scatter(flood_reports.index.values, flood_reports['count'], color='k', alpha=0.5)
         ax.plot(t.index.values, t['mean'], color='g', alpha=0.5, label="mean")
+        ax.plot(t.index.values, t['std'], color='r', alpha=0.5, label="mean")
         ax1.plot(t.index.values, t['signal'], color='r', alpha=0.5, label="signal")
         if (filename):
             plt.savefig(filename)
@@ -208,7 +220,8 @@ def test_harness(alg, known_flooding, flood_reports, filename="./graphs/temp.png
 
 
     ax.legend()
-    plt.show()
+    if ( show):
+        plt.show()
     return
 
 def test_harness_cusum(alg, known_flooding, flood_reports, filename="./graphs/temp.png", animate=False):
@@ -421,6 +434,9 @@ def cusum_bin_by_hour():
     test_harness_cusum(alg, known, reports, filename="./graphs/bin_by_hour_jbd_feb_cusum.png", animate=False)
 
 def moving_average_bin_by_hour():
+    global engine
+    engine = create_engine("postgresql://postgres:postgres@localhost:5432/petabencana")
+
     start_known_flood = "'2017-02-20 00:00:35.630000-05:00'"
     end = "'2017-02-23 00:00:35.630000-05:00'"
     interval = "'1 hour'"
@@ -433,8 +449,8 @@ def moving_average_bin_by_hour():
     reports = get_data( start_all_reports, end_all_reports) 
 
     alg = spf.streaming_peak_finder(10, 40)
-    #test_harness(alg, known, reports, filename="./graphs/moving_avg_bin_by_hour_feb_jbd.png", animate=False)
-    test_harness(alg, known, reports, filename="./graphs/moving_avg_bin_by_hour_feb_jbd.gif", animate=True)
+    test_harness(alg, known, reports, filename="./graphs/moving_avg_bin_by_hour_feb_jbd.png", animate=False, show=False)
+    #test_harness(alg, known, reports, filename="./graphs/moving_avg_bin_by_hour_feb_jbd.gif", animate=True)
     #test_harness(alg, known, reports, filename=None, animate=True)
 
 def moving_average_bin_by_hour_chennai():
@@ -452,8 +468,8 @@ def moving_average_bin_by_hour_chennai():
     #reports = get_data( start_all_reports, end_all_reports, interval) 
     reports = get_data_chennai( start_all_reports, end_all_reports) 
 
-    alg = spf.streaming_peak_finder(5, 5)
-    test_harness(alg, known, reports, filename="None", animate=False)
+    alg = spf.streaming_peak_finder(5,10)
+    #test_harness(alg, known, reports, filename="./graphs/moving_avg_bin_by_hour_nov_chn.png", animate=False, show=False)
     test_harness(alg, known, reports, filename="./graphs/moving_avg_bin_by_hour_nov_chn.gif", animate=True)
     #test_harness(alg, known, reports, filename=None, animate=True)
 
@@ -470,6 +486,9 @@ def moving_average_bin_by_minute():
     test_harness(alg, known, reports, filename="./graphs/moving_avg_bin_by_minute.png")
 
 def moving_average_bin_by_hour_2016():
+    global engine
+    engine = create_engine("postgresql://postgres:postgres@localhost:5432/petabencana")
+
     start_known_flood = "'2016-02-25 00:00:35.630000-05:00'"
     end = "'2016-02-27 00:00:35.630000-05:00'"
     known = get_data( start_known_flood, end)
@@ -482,7 +501,7 @@ def moving_average_bin_by_hour_2016():
     stdDev = stats[2]
     print(stats)
     alg = spf.streaming_peak_finder(10, stdDev*2)
-    test_harness(alg, known, reports, filename="./graphs/moving_avg_bin_by_hour_feb_2016_jbd.png")
+    test_harness(alg, known, reports, filename="./graphs/moving_avg_bin_by_hour_feb_2016_jbd.png", show=False)
 
 if __name__ == "__main__":
     #cusum_bin_by_min()

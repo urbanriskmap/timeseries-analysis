@@ -51,8 +51,8 @@ class streaming_peak_finder:
         median = temp.median()
         std = temp.std()
 
-        otherStd = pd.Series(self.big_window).std()
-        signal = mean > self.threshold
-        #signal = mean > otherStd*3
+        otherStd = std*1.5# pd.Series(self.big_window).std()
+        #signal = mean > self.threshold
+        signal = mean > otherStd
 
         return (mean, median, otherStd, signal)
