@@ -2,3 +2,5 @@ pandas==0.22.0
 sqlalchemy==1.2.0
 psycopg2
 matplotlib
+boto3
+requests
