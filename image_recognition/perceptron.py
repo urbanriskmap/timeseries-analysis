@@ -64,7 +64,7 @@ def plot_separator(ax, th, th_0):
     if in_pts and len(in_pts) >= 2:
         # Plot separator
         vpts = np.vstack(in_pts)
-        ax.plot(vpts[:,0], vpts[:,1], 'k-', lw=2)
+        ax.plot(vpts[:,0], vpts[:,1], 'k-', lw=2, color='green')
         # Plot normal
         vmid = 0.5*(in_pts[0] + in_pts[1])
         scale = np.sum(th*th)**0.5
