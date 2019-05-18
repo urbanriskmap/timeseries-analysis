@@ -1,5 +1,6 @@
 _python/
-*/__pycache__/
+*__pycache__/
+*.pyc
 
 #for vim
 *.swp
@@ -7,3 +8,8 @@ _python/
 
 # don't include image folder, it is huge
 /image_recognition/img/*
+
+*.p
+*/eu-flood/
+*/european-flood-2013_imgs_small.zip
+

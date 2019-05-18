@@ -225,7 +225,7 @@ def test_harness(alg, known_flooding, flood_reports, filename="./graphs/temp.png
     return
 
 def test_harness_cusum(alg, known_flooding, flood_reports, filename="./graphs/temp.png", animate=False):
-    """ Plays each flood report in turn to the streaming algorithm, creating an animation if animate=True
+    """ Plays each flood report in turn to the streaming algorithm, creating an animation
     Args: 
         alg: the streaming algorithm class. Has a input_report() function that takes in a report
             input_report returns
@@ -275,6 +275,12 @@ def test_harness_cusum(alg, known_flooding, flood_reports, filename="./graphs/te
     plt.show()
     return
 
+def basic_score(known_flooding, flood_reports, signal_from_alg):
+    '''
+    Gives a numerical score based on known flooding vs. signal from streaming alg
+
+    '''
+
 def scatterPlot():
     limit = 3000
     
@@ -300,6 +306,31 @@ def scatterPlot():
     
     df['flood_depth'] = df['flood_depth'].apply(remove_none_turn_to_int)
 
+#    num_reports_by_hour = pd.read_sql_query('''
+#            SELECT * 
+#            FROM (
+#                SELECT date_trunc('hour', offs) as date 
+#                    FROM generate_series('2017-02-18 01:00:35.630000-05:00'::timestamp, 
+#                    '2017-02-24 01:00:35.630000-05:00'::timestamp,
+#                    '1 hour'::interval) as offs
+#                ) h
+#            LEFT JOIN(
+#                SELECT date_trunc('hour', created_at), count(pkey)
+#                    FROM (all_reports 
+#                        WHERE text NOT SIMILAR TO '%%test%%'
+#                        GROUP BY date_trunc('hour', created_at)
+#            LIMIT ''' + str(limit) + '''))
+#            
+#            ''', con=engine, index_col="date_trunc")
+
+# 
+#              (select date_trunc('hour', created_at), count(pkey) 
+#                 from all_reports 
+#                   WHERE text  NOT SIMILAR To '%(T|t)(E|e)(S|s)(T|t)%' 
+#                   GROUP BY date_trunc('hour', created_at)
+#                 );
+
+
     num_reports_with_zeros = pd.read_sql_query('''
         SELECT date, COALESCE(count, NULL, 0) as count FROM 
 		(SELECT date_trunc('hour', offs) as date FROM 
@@ -320,6 +351,18 @@ def scatterPlot():
     
     print(df.shape)
 
+    # for non heavy flooding 
+    #		generate_series('2014-12-29 01:00:35.630000-05:00'::timestamp, 
+    #		'2015-01-20 01:00:35.630000-05:00'::timestamp,
+    #standard dev:
+    #0.4227586389603458
+    #mean
+    #0.14177693761814744
+    #mu = 0.14177693761814744
+    #sigma = 0.4227586389603458
+
+    # 2017-02-10 
+    # 2017-02-17
     mu = 1.4497041420118344
     sigma = 2.4444086893395007
 
@@ -356,12 +399,16 @@ def cusum_bin_by_min():
     start_known_flood = "'2017-02-20 00:00:35.630000-05:00'"
     end = "'2017-02-23 00:00:35.630000-05:00'"
     interval = "'1 hour'"
+    #known = get_data( start_known_flood, end, interval)
     known = get_data_bin_by_minute( start_known_flood, end)
 
     start_all_reports = "'2017-02-10 00:00:35.630000-05:00'"
     end_all_reports = "'2017-02-27 00:00:35.630000-05:00'"
+    #reports = get_data( start_all_reports, end_all_reports, interval) 
     reports = get_data_bin_by_minute( start_all_reports, end_all_reports) 
 
+    #alg = spf.streaming_peak_finder(10, 1)
+    #test_harness(alg, known, reports)
     from CUSUM import streaming_peak_finder_cusum
     mu = stats_between_dates(start_all_reports, start_known_flood)[0]
     alg = streaming_peak_finder_cusum(10, 1, mu=mu)
@@ -371,12 +418,16 @@ def cusum_bin_by_hour():
     start_known_flood = "'2017-02-20 00:00:35.630000-05:00'"
     end = "'2017-02-23 00:00:35.630000-05:00'"
     interval = "'1 hour'"
+    #known = get_data( start_known_flood, end, interval)
     known = get_data( start_known_flood, end)
 
     start_all_reports = "'2017-02-10 00:00:35.630000-05:00'"
     end_all_reports = "'2017-02-27 00:00:35.630000-05:00'"
+    #reports = get_data( start_all_reports, end_all_reports, interval) 
     reports = get_data( start_all_reports, end_all_reports) 
 
+    #alg = spf.streaming_peak_finder(10, 1)
+    #test_harness(alg, known, reports)
     from CUSUM import streaming_peak_finder_cusum
     mu = stats_between_dates(start_all_reports, start_known_flood)[0]
     alg = streaming_peak_finder_cusum(10, 1, mu=mu)
@@ -389,14 +440,18 @@ def moving_average_bin_by_hour():
     start_known_flood = "'2017-02-20 00:00:35.630000-05:00'"
     end = "'2017-02-23 00:00:35.630000-05:00'"
     interval = "'1 hour'"
+    #known = get_data( start_known_flood, end, interval)
     known = get_data( start_known_flood, end)
 
     start_all_reports = "'2017-02-10 00:00:35.630000-05:00'"
     end_all_reports = "'2017-02-27 00:00:35.630000-05:00'"
+    #reports = get_data( start_all_reports, end_all_reports, interval) 
     reports = get_data( start_all_reports, end_all_reports) 
 
     alg = spf.streaming_peak_finder(10, 40)
     test_harness(alg, known, reports, filename="./graphs/moving_avg_bin_by_hour_feb_jbd.png", animate=False, show=False)
+    #test_harness(alg, known, reports, filename="./graphs/moving_avg_bin_by_hour_feb_jbd.gif", animate=True)
+    #test_harness(alg, known, reports, filename=None, animate=True)
 
 def moving_average_bin_by_hour_chennai():
     global engine
@@ -405,14 +460,18 @@ def moving_average_bin_by_hour_chennai():
     start_known_flood = "'2017-11-01 00:00:35.630000-04:00'"
     end = "'2017-11-07 00:00:35.630000-04:00'"
     interval = "'1 hour'"
+    #known = get_data( start_known_flood, end, interval)
     known = get_data_chennai( start_known_flood, end)
 
     start_all_reports = "'2017-11-01 00:00:35.630000-04:00'"
     end_all_reports = "'2017-11-9 00:00:35.630000-04:00'"
+    #reports = get_data( start_all_reports, end_all_reports, interval) 
     reports = get_data_chennai( start_all_reports, end_all_reports) 
 
     alg = spf.streaming_peak_finder(5,10)
+    #test_harness(alg, known, reports, filename="./graphs/moving_avg_bin_by_hour_nov_chn.png", animate=False, show=False)
     test_harness(alg, known, reports, filename="./graphs/moving_avg_bin_by_hour_nov_chn.gif", animate=True)
+    #test_harness(alg, known, reports, filename=None, animate=True)
 
 def moving_average_bin_by_minute():
     start_known_flood = "'2017-02-20 00:00:35.630000-05:00'"
@@ -448,6 +507,9 @@ if __name__ == "__main__":
     #cusum_bin_by_min()
     #cusum_bin_by_hour()
     #moving_average_bin_by_hour()
-    #moving_average_bin_by_hour_chennai()
-    moving_average_bin_by_hour_2016()
+    moving_average_bin_by_hour_chennai()
+    #moving_average_bin_by_hour_2016()
     #moving_average_bin_by_minute()
+
+
+
