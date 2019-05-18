@@ -16,6 +16,10 @@ def get_and_pickle_all_sents(filename='./sents.p'):
 def load_pickled_sents(filename='./nlp/sents.p'):
     return pickle.load(open(filename, "rb"))
 
+def build_matrix(sents):
+    return
+    
+
 def p_flood_given_neg(sents, flood_keys, non_flood_keys):
     '''
     probabilty of flooding given a negative sentiment
