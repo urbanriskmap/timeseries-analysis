@@ -98,7 +98,8 @@ def get_labels_aws(url):
         return client.detect_labels(
             Image={
                 "Bytes": img_bytes
-                })
+                },
+            MinConfidence=.10)
     else:
         return dict()
 
@@ -131,7 +132,7 @@ def filter_labels(wanted, given):
             res[each] = given[each]
     return res
 
-def dump_labels_to_disk():
+def dump_labels_to_disk(filename="./labels.p"):
     img_urls = get_image_urls()
     pkey_to_labels = dict()
     for pkey in img_urls.keys():
@@ -141,10 +142,10 @@ def dump_labels_to_disk():
         # dict to json and then put in the database
         # ALTER TABLE ADD COLUMN 'labels'  of type json
         # ALTER TABLE ADD COLUMN 'feature_vector'
-        pickle.dump( pkey_to_labels, open("./labels.p", "wb"))
+        pickle.dump( pkey_to_labels, open(filename, "wb"))
 
-def read_labels_from_disk():
-    return pickle.load(open("labels.p", "rb"))
+def read_labels_from_disk(filename="./labels.p"):
+    return pickle.load(open(filename, "rb"))
 
 def clean_if_dirty(data):
     res = {}
@@ -286,4 +287,5 @@ def make_labels_rep_zeros(featureDict):
     return out
 
 if __name__ == "__main__":
+    dump_labels_to_disk("./min_confidence.p")
     labes = read_labels_from_disk()

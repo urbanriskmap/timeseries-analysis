@@ -85,5 +85,8 @@ if __name__ == "__main__":
 
 
     #more = ['Car', 'Traffic Jam', 'Motorcycle']
-    #allowed = {'Flood':0, 'Water':1, 'Puddle':2, 'Person':3}
+    allowed = {'Flood':0, 'Water':1, 'Puddle':2, 'Person':3}
+    perf_given_categories(allowed)
+
+    #what if we only used the 'Flood' category?
     perf_given_categories({"Flood":0, "noop":1})
