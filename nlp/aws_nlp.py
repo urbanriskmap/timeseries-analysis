@@ -1,6 +1,5 @@
 import boto3 as boto3
 import pandas as pd
-import util as util
 from sqlalchemy import create_engine
 
 global engine
@@ -15,7 +14,34 @@ client = boto3.client('comprehend', region_name='us-east-1')
 def get_flood_keys(en=engine):
     start_known_flood = "'2017-11-01 00:00:35.630000-04:00'"
     end = "'2017-11-07 00:00:35.630000-04:00'"
-    known_flood_chennai = util.get_flood_pkeys(start_known_flood, end, engine)
+    known_flood_chennai = get_flood_pkeys(start_known_flood, end, engine)
+
+
+def get_flood_pkeys(start_date, end_date, engine):
+    # gets the pkeys of reports during flood dates
+
+    pkeys = pd.read_sql_query('''
+        SELECT pkey, created_at FROM riskmap.all_reports WHERE
+            created_at > %(start_date)s::timestamptz
+                AND 
+            created_at < %(end_date)s::timestamptz
+    ''', params={"start_date": start_date, "end_date": end_date}, con=engine, index_col="pkey")
+
+    return pkeys
+
+
+def get_no_flood_pkeys(start_flood_date, end_flood_date, engine):
+    # gets the pkeys of reports during flood dates
+
+    pkeys = pd.read_sql_query('''
+        SELECT pkey, created_at FROM riskmap.all_reports WHERE
+            created_at < %(start_date)s::timestamptz
+                AND 
+            created_at > %(end_date)s::timestamptz
+    ''', params={"start_date": start_flood_date, "end_date": end_flood_date}, con=engine, index_col="pkey")
+
+    return pkeys
+
 
 def get_all_report_text(en=engine):
     rows = pd.read_sql_query('''

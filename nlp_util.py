@@ -1,5 +1,5 @@
-import aws_nlp as nlp
-import util as util
+import nlp.aws_nlp as nlp
+import nlp.util as util
 import pickle
 
 def get_and_pickle_all_sents(filename='./sents.p'):
@@ -13,7 +13,7 @@ def get_and_pickle_all_sents(filename='./sents.p'):
     for index, row in text.iterrows():
         print(row['text'],  nlp.get_sentiment(row['text']))
 
-def load_pickled_sents(filename='./sents.p'):
+def load_pickled_sents(filename='./nlp/sents.p'):
     return pickle.load(open(filename, "rb"))
 
 def p_flood_given_neg(sents, flood_keys, non_flood_keys):
