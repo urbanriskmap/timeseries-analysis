@@ -11,8 +11,12 @@ import simple_nn as nn
 import nlp.aws_nlp as aws_nlp
 import nlp_util as nlp_util 
 
+import flood_depth as flood_depth
+
 SEPARATOR_FILENAME = './separator.p'
 USE_SAVED_SEPARATOR = True
+
+LOCATION = 'ch'
 
 def load_saved_separator():
     return pickle.load(open(SEPARATOR_FILENAME,'rb'))
@@ -40,13 +44,24 @@ if __name__ == '__main__':
     t_sd = torch.from_numpy(sd).float()
 
     # add in the sentimets 
-    sents = nlp_util.load_pickled_sents()
+    # only for chennai! 
+    if (LOCATION == 'ch'):
+        sents = nlp_util.load_pickled_sents()
+        sents_matrix_w_pkey = nlp_util.build_matrix(sents)
+        sents_matrix = sents_matrix_w_pkey[1:,:]
+        print(sents_matrix_w_pkey.shape)
 
+    # load flood heights
+    if (LOCATION == 'ch'):
+        flood_depth_df = flood_depth.get_flood_depth_chennai()
+    else:
+        flood_depth_df = flood_depth.get_flood_depth_jakarta()
 
+    flood_depth_w_pkeys = flood_depth.make_matrix(flood_depth_df)
+    flood_depth_matrix = flood_depth_w_pkeys[1:,:]
 
-
-
-    model = nn.Simple_nn(1, 1)
+    full_matrix = np.vstack((sd.T, flood_depth_matrix, sents_matrix))
+    model = nn.Simple_nn(3, 1)
 
     nn.run_training(model, t_sd, t_labels)
 

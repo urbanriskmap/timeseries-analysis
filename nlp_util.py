@@ -2,6 +2,8 @@ import nlp.aws_nlp as nlp
 import nlp.util as util
 import pickle
 
+import numpy as np
+
 def get_and_pickle_all_sents(filename='./sents.p'):
     text = nlp.get_all_report_text()
     print(text.index.names)
@@ -17,7 +19,15 @@ def load_pickled_sents(filename='./nlp/sents.p'):
     return pickle.load(open(filename, "rb"))
 
 def build_matrix(sents):
-    return
+    '''
+
+    '''
+    out = np.zeros((2, len(sents.keys())))
+    # for pkey, value in sents.items():
+    for i, pkey in enumerate(sorted(sents.keys())):
+        out[0, i] = pkey
+        out[1, i] = sents[pkey]['SentimentScore']['Negative']
+    return out
     
 
 def p_flood_given_neg(sents, flood_keys, non_flood_keys):
