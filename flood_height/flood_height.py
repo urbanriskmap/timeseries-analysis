@@ -19,6 +19,7 @@ def get_flood_depth_chennai():
 	    WHERE report_data->>'flood_depth' IS NOT NULL
     ''', con=CH_ENGINE, index_col="pkey")
 
+    print(pkeys_and_flood_depth)
     return pkeys_and_flood_depth
 
 def get_flood_depth_jakarta():
@@ -28,6 +29,7 @@ def get_flood_depth_jakarta():
 	    WHERE report_data->>'flood_depth' IS NOT NULL
     ''', con=IN_ENGINE, index_col="pkey")
 
+    print(pkeys_and_flood_depth)
     return pkeys_and_flood_depth
 
 def make_matrix(flood_depth):

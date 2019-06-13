@@ -33,6 +33,9 @@ global engine
 DATABASE = "cognicity"
 engine = create_engine("postgresql://postgres:postgres@localhost:5432/"+ DATABASE)
 
+CH_DATABASE = "riskmap"
+CH_ENGINE = create_engine("postgresql://postgres:postgres@localhost:5432/"+ CH_DATABASE)
+
 def get_image_urls():
     '''
     returns dictionary of {pkey: image_url} for all rows in db that have an image url
@@ -46,6 +49,17 @@ def get_image_urls():
     
     return rows.to_dict()['image_url']
 
+def get_image_urls_chennai():
+    '''
+    returns dictionary of {pkey: image_url} for all rows in db that have an image url
+    '''
+    rows = pd.read_sql_query('''
+    SELECT pkey, image_url FROM riskmap.all_reports
+        WHERE image_url IS NOT null
+        ORDER BY created_at
+    ''', con=CH_ENGINE, index_col="pkey")
+    return rows.to_dict()['image_url']
+
 def get_df():
     global engine
     rows = pd.read_sql_query('''
@@ -57,7 +71,7 @@ def get_df():
     print(rows.columns.values)
     return rows
 
-def fetch_images():
+def fetch_images(location='id'):
     image_urls = get_image_urls()
     for key in image_urls.keys():
         each = image_urls[key]
@@ -66,7 +80,10 @@ def fetch_images():
         if r.status_code == 200:
             try:
                 im = Image.open(r.raw)
-                im.save("./img/"+ str(key) + ".jpeg", "JPEG")
+                if location == 'id':
+                    im.save("./img/"+ str(key) + ".jpeg", "JPEG")
+                else:
+                    im.save("./img_ch/"+ str(key) + ".jpeg", "JPEG")
             except:
                 print("ERROR FETCHING", each)
         else: 
@@ -90,17 +107,20 @@ def modify_df(df):
             print(row)
 
 def get_labels_aws(url):
-    r = requests.get(url)
-    if r.status_code == 200:
-        img_bytes = io.BytesIO(r.content).getvalue()
-        print('requesting: ' + url);
-        client = boto3.client("rekognition", region_name='ap-south-1')
-        return client.detect_labels(
-            Image={
-                "Bytes": img_bytes
-                },
-            MinConfidence=.10)
-    else:
+    try:
+        r = requests.get(url)
+        if r.status_code == 200:
+            img_bytes = io.BytesIO(r.content).getvalue()
+            print('requesting: ' + url);
+            client = boto3.client("rekognition", region_name='ap-south-1')
+            return client.detect_labels(
+                Image={
+                    "Bytes": img_bytes
+                    },
+                MinConfidence=.10)
+        else:
+            return dict()
+    except:
         return dict()
 
 def get_labels_aws_from_bucket(url):
@@ -132,8 +152,11 @@ def filter_labels(wanted, given):
             res[each] = given[each]
     return res
 
-def dump_labels_to_disk(filename="./labels.p"):
-    img_urls = get_image_urls()
+def dump_labels_to_disk(filename="./labels.p", location='id'):
+    if location == 'id':
+        img_urls = get_image_urls()
+    else:
+        img_urls = get_image_urls_chennai()
     pkey_to_labels = dict()
     for pkey in img_urls.keys():
         print(pkey)
@@ -219,22 +242,32 @@ def make_matrix_rep_zeros(featureDict, lenFeatVect):
     return out
 
 
-def make_labels_rep(featureDict):
+def make_labels_rep(featureDict, location='id'):
     # if pkey exists in feature dict, figures out if flooding 
     # else zero
 
     #start_known_flood = "'2017-02-20 00:00:35.630000-05:00'"
     #end_known_flood = "'2017-02-23 00:00:35.630000-05:00'"
+    if location == 'id':
+        start_known_flood = "2017-02-20 00:00:35.630000-05:00"
+        end_known_flood =   "2017-02-23 00:00:35.630000-05:00"
+        global engine
+        knownFlood = pd.read_sql_query('''
+            SELECT pkey from cognicity.all_reports
+            WHERE created_at > '2017-02-20 00:00:35.630000-05:00'
+            AND created_at < '2017-02-23 00:00:35.630000-05:00'
+        ''', con=engine, params={"start_known_flood": start_known_flood, "end_known_flood":end_known_flood})
 
-    start_known_flood = "2017-02-20 00:00:35.630000-05:00"
-    end_known_flood =   "2017-02-23 00:00:35.630000-05:00"
-    # TODO Make the dates programatic
-    global engine
-    knownFlood = pd.read_sql_query('''
-        SELECT pkey from cognicity.all_reports
-        WHERE created_at > '2017-02-20 00:00:35.630000-05:00'
-        AND created_at < '2017-02-23 00:00:35.630000-05:00'
-    ''', con=engine, params={"start_known_flood": start_known_flood, "end_known_flood":end_known_flood})
+    else:
+        start_known_flood = "'2017-11-01 00:00:35.630000-04:00'"
+        end_known_flood = "'2017-11-07 00:00:35.630000-04:00'"
+
+        knownFlood = pd.read_sql_query('''
+            SELECT pkey from riskmap.all_reports
+            WHERE created_at > %(start_known_flood)s::timestamptz
+            AND created_at < %(end_known_flood)s::timestamptz
+        ''', con=CH_ENGINE, params={"start_known_flood": start_known_flood, "end_known_flood":end_known_flood})
+
 
     knownFloodSet = set(knownFlood['pkey'])
     print(knownFloodSet)
@@ -286,6 +319,11 @@ def make_labels_rep_zeros(featureDict):
             out[0, i]
     return out
 
+def dump_labels_to_disk_chennai(filename='./min_confidence_chennai_labels.p'):
+    dump_labels_to_disk(filename, 'ch')
+    return
+
 if __name__ == "__main__":
-    dump_labels_to_disk("./min_confidence.p")
+    dump_labels_to_disk_chennai()
+    # dump_labels_to_disk("./min_confidence.p")
     labes = read_labels_from_disk()

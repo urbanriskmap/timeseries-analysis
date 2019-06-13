@@ -20,15 +20,15 @@ class Simple_nn(torch.nn.Module):
 
 def run_training(model, x_data, y_data):
     lossfn = torch.nn.NLLLoss()
-    optimizer = torch.optim.SGD(model.parameters(), lr=0.0001)
-    for epoch in range(2000):
+    optimizer = torch.optim.SGD(model.parameters(), lr=0.001)
+    for epoch in range(1000):
         model.train()
         optimizer.zero_grad()
         # Forward pass
         y_pred = model(x_data)
         # Compute Loss
         loss = lossfn(y_pred, y_data)
-        print('Loss:', loss)
+        # print('Loss:', loss)
     
         # Backward pass
         loss.backward()

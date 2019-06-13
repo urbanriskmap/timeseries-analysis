@@ -11,7 +11,7 @@ def save_feature_vectors(featDict, filename="./features.p"):
 def load_feature_vectors(featDict, filename="./features.p"):
     return pickle.load(open(filename, "rb"))
 
-def perf_given_categories(allowed_cat={'Flood':0, 'Water':1, 'Puddle':2, 'Person':3}, plot=False, top_lab=30):
+def perf_given_categories(allowed_cat={'Flood':0, 'Water':1, 'Puddle':2, 'Person':3}, plot=False, top_lab=30, label_filename='./image_recognition/min_confidence.p', location='id'):
     '''
     if we ask aws for these categories, what performance do we get? 
 
@@ -19,7 +19,7 @@ def perf_given_categories(allowed_cat={'Flood':0, 'Water':1, 'Puddle':2, 'Person
         Most important labels
 
     '''
-    labels = aws.read_labels_from_disk('./image_recognition/min_confidence.p')
+    labels = aws.read_labels_from_disk(label_filename)
     clean = aws.clean_if_dirty(labels)
 
     vects = aws.make_feature_vectors(clean, allowed_cat)
@@ -28,13 +28,14 @@ def perf_given_categories(allowed_cat={'Flood':0, 'Water':1, 'Puddle':2, 'Person
     l = len(list(allowed_cat))
     # don't include zero data - first row is pkey of data
     matrix_w_pkey = aws.make_matrix_rep(vects, l)
-    labels_w_pkey = aws.make_labels_rep(vects)
+    labels_w_pkey = aws.make_labels_rep(vects, location=location)
+
 
     matrix = matrix_w_pkey[1:,:]
     labels = labels_w_pkey[1:,:]
 
 
-    th, th0 = ml.perceptron(matrix, labels, params={"T":3000})
+    th, th0 = ml.perceptron(matrix, labels, params={"T":300})
 
     # get the indexes of the top n elements in th
     # correspond to the most important params 
@@ -49,6 +50,7 @@ def perf_given_categories(allowed_cat={'Flood':0, 'Water':1, 'Puddle':2, 'Person
     
     if (plot):
         print("MAX LABELS: ",max_labels)
+        print("MAX LABELS: ", [each[0] for each in max_labels])
         ax = ml.plot_data(matrix, labels, picker=True)
     
         # now we know each of these points is an image in ./img folder
@@ -84,6 +86,10 @@ def perf_given_categories(allowed_cat={'Flood':0, 'Water':1, 'Puddle':2, 'Person
 # top30 labels according to perceptron
 top30 = ['Woodland', 'Man', 'Radiator', 'Sports Car', 'Hand', 'Studio', 'Cottage', 'Beach', 'Reservoir', 'Desk', 'Panoramic', 'Towpath', 'Ripple', 'Countryside', 'Mammal', 'Construction', 'Wildlife', 'Coupe', 'Parade', 'Slum', 'Grove', 'Strap', 'Fish', 'Coffee Table', 'Ground', 'Planter', 'Trail', 'Vacation', 'Sedan', 'Boiling']
 top30allowed = dict([ (current_label, index) for index, current_label in enumerate(list(top30))])
+
+TOP10_CH = ['Walking', 'College', 'Vessel', 'Machine', 'Fence', 'Urban', 'Hut', 'Trash', 'Costume', 'Walkway', 'Flood', 'Boat']
+TOP10_CH = dict([ (current_label, index) for index, current_label in enumerate(list(TOP10_CH))])
+
 
 labels = aws.read_labels_from_disk()
 clean = aws.clean_if_dirty(labels)
