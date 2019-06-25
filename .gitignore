@@ -13,3 +13,5 @@ _python/
 */eu-flood/
 */european-flood-2013_imgs_small.zip
 
+# log files
+*.log

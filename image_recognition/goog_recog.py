@@ -28,72 +28,76 @@ from matplotlib.animation import FuncAnimation
 import datetime
 from sqlalchemy import create_engine
 
-import common as util
+from common import CognicityImageLoader 
 
 from google.cloud.vision_v1 import ImageAnnotatorClient
 client = ImageAnnotatorClient()
 
-def load_labels_from_disk(filename='./goog_labels_chennai.p'):
-    return pickle.load(open(filename, 'rb'))
-
-def dump_labels_to_disk(labels, filename='./goog_labels_chennai.p'):
-    pickle.dump(labels, open(filename, 'wb'))
-    return
-
-def make_feature_vectors(inp, allowed):
-    ''' 
-    Args:
-        inp: 
-            Dictionary of pkeys-> AnnotateImageResponse from google cloud.
-        allowed: 
-            Dictionary of allowed word to the index in the feature vector 
-
-            example: allowed = {'Flood':0, 'Flooding':1, 'Water':2, 'Puddle':3, 'Person':4}
-            would create feature vectors  where the zeroth feature is the confidence score of 
-            Flood in picture, 1st element is Flooding and so on
+class GoogleLabeler:
+    def __init__(self, config):
+        self.config = config
+    
+    def load_labels_from_disk(filename='./goog_labels_chennai.p'):
+        return pickle.load(open(filename, 'rb'))
+    
+    def dump_labels_to_disk(labels, filename='./goog_labels_chennai.p'):
+        pickle.dump(labels, open(filename, 'wb'))
+        return
+    
+    def make_feature_vectors(inp, allowed):
+        ''' 
+        Args:
+            inp: 
+                Dictionary of pkeys-> AnnotateImageResponse from google cloud.
+            allowed: 
+                Dictionary of allowed word to the index in the feature vector 
+    
+                example: allowed = {'Flood':0, 'Flooding':1, 'Water':2, 'Puddle':3, 'Person':4}
+                would create feature vectors  where the zeroth feature is the confidence score of 
+                Flood in picture, 1st element is Flooding and so on
+        
+        
+        Returns:
+            Dictionary{ string Pkey: list{float}}  where list is a vector defined by allowed
+    
+        '''
+        # dict of pkeys to feature vectors
+        features = dict([ (key, [0]*len(allowed.keys())) for key in inp.keys()] )
+        for pkey in inp.keys():
+            # print(inp[pkey])
+            # print('key: ', pkey)
+            labels = inp[pkey].label_annotations
+            for entityObject in labels:
+                desc = entityObject.description
+                if desc in allowed:
+                    features[pkey][allowed[desc]] = float(entityObject.score)
+            #print('pkey', pkey)
+            #print(features)
+        return features
     
     
-    Returns:
-        Dictionary{ string Pkey: list{float}}  where list is a vector defined by allowed
-
-    '''
-    # dict of pkeys to feature vectors
-    features = dict([ (key, [0]*len(allowed.keys())) for key in inp.keys()] )
-    for pkey in inp.keys():
-        # print(inp[pkey])
-        # print('key: ', pkey)
-        labels = inp[pkey].label_annotations
-        for entityObject in labels:
-            desc = entityObject.description
-            if desc in allowed:
-                features[pkey][allowed[desc]] = float(entityObject.score)
-        #print('pkey', pkey)
-        #print(features)
-    return features
-
-
-def get_labels(image_urls, hook=None):
-    labels = dict()
-
-    for pkey, img_name in image_urls.items():
-        try:
-            request = {
-                    'image': {
-                        'source': {'image_uri': img_name},
-                        },
-                    }
-            response = client.annotate_image(request)
-            labels[pkey] = response
-            print(response)
+    def get_labels(image_urls, hook=None):
+        labels = dict()
     
-            if hook is not None:
-                print('labeled pkey ', pkey)
-                print('img url ', img_name)
-                hook(labels)
-        except:
-            print('ERROR LABELING PKEY: ', pkey)
-            print('WITH IMG URL: ', img_name)
-    return labels
+        for pkey, img_name in image_urls.items():
+            try:
+                request = {
+                        'image': {
+                            'source': {'image_uri': img_name},
+                            },
+                        }
+                response = client.annotate_image(request)
+                labels[pkey] = response
+                print(response)
+        
+                if hook is not None:
+                    print('labeled pkey ', pkey)
+                    print('img url ', img_name)
+                    hook(labels)
+            except:
+                print('ERROR LABELING PKEY: ', pkey)
+                print('WITH IMG URL: ', img_name)
+        return labels
 
 if __name__ == "__main__":
 
