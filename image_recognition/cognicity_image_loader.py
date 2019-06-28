@@ -21,6 +21,7 @@ class CognicityImageLoader:
         self.location = configObj["location"]
         self.img_folder_prefix = configObj["img_folder_prefix"]
         self.logger = configObj["logger"]
+        self.logger.debug("CognicityImageLoader constructed")
 
     def get_image_urls(self):
         """

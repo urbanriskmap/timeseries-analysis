@@ -14,9 +14,10 @@ TEST_LOCATION = "id"
 LOGGER = logging.getLogger()
 LOGGER.setLevel(logging.DEBUG)
 
-formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
 
-fh = logging.FileHandler('test_log_filename.log')
+TEST_LOG_FILENAME = "test_log_filename.log"
+fh = logging.FileHandler(TEST_LOG_FILENAME)
 fh.setLevel(logging.DEBUG)
 fh.setFormatter(formatter)
 LOGGER.addHandler(fh)
@@ -35,6 +36,8 @@ class CognicityImageLoaderTest(unittest.TestCase):
     port 5432 with username postgres and password postgres
     These are integration tests, not just unit tests. As such, 
     those that require a database will not run on travis ci
+
+    Also, test methods need to start with "test_" in order to be run
     """
 
     def setUp(self):
@@ -129,7 +132,14 @@ class CognicityImageLoaderTest(unittest.TestCase):
 
         # clean up after ourselves
         shutil.rmtree(IMG_FOLDER_PREFIX + NEW_TEST_LOCATION, ignore_errors=True)
-        pass
+
+    def test_logging_file_exists(self):
+        self.assertTrue(os.path.exists(TEST_LOG_FILENAME))
+        self.assertTrue(os.stat(TEST_LOG_FILENAME).st_size > 0)
+
+    @classmethod
+    def tearDownClass(cls):
+        os.remove(TEST_LOG_FILENAME)
 
 if __name__ == "__main__":
     unittest.main()
