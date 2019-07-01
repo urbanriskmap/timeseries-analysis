@@ -3,6 +3,8 @@ import requests
 import os
 from PIL import Image
 
+import numpy as np
+
 class CognicityImageLoader:
 
     def __init__(self, configObj):
@@ -49,7 +51,7 @@ class CognicityImageLoader:
         image_urls = self.get_image_urls()
         for key in image_urls.keys():
             each = image_urls[key]
-            print("Image Url is: " + each)
+            self.logger.info("Image Url is: " + each)
             try:
                 r = requests.get(each, stream=True)
                 if r.status_code == 200:
@@ -80,14 +82,35 @@ class CognicityImageLoader:
                 self.logger.error("Malformed url :" + each)
     
     
-    def make_matrix_rep(self, featureDict, lenFeatVect):
+    def make_matrix_rep(self, feature_dict, len_feat_vect):
+        """ Turns a labels dictionary into a matrix
+
+        Args:
+            feature_dict ( pkey (int): [  confidence (float)]):
+                A dictionary that maps from positive integer pkeys into a list of confidence 
+                values.
+            len_feat_vect (int): the number of labels (must be same for every pkey)
+        Returns:
+            matrix_rep (np.array( num_labels+1, num_pkeys)): a matrix representation where 
+            every column is one feature vector with the zeroth element being the pkey
+            order is preserved in confidece score list, 
+
+            Example if pkey 0 has confidece values [ 1.12, 2.8984, 3.28227] then 
+            the zeroth column of matrix_rep, which is matrix_rep[:, 0] is 
+            np.array([0 (pkey), 1.12, 2.8984, 3.28227]) in order.
+            
+            it is up to the caller to maintain which confidence score goes with which label
+
+            looks like: 
+            pkey0    | pkey1 .. 
+            featvect | featV1
+
+        """
     
-        # looks like: 
-        # pkey0    | pkey1 .. 
-        # featvect | featV1
-        out = np.zeros((lenFeatVect +1, len(featureDict.keys())))
-        for i, pkey in enumerate(sorted(featureDict)):
-            l = featureDict[pkey].copy() # shallow copy because they're builtins
+        out = np.zeros((len_feat_vect +1, len(feature_dict.keys())))
+        for i, pkey in enumerate(sorted(feature_dict)):
+            assert(pkey >=0 )
+            l = feature_dict[pkey].copy() # shallow copy because they're builtins
             l.insert(0, pkey)
             out[:,i] = np.array(l)
         return out
@@ -120,7 +143,8 @@ class CognicityImageLoader:
     
     
         knownFloodSet = set(knownFlood["pkey"])
-        print(knownFloodSet)
+        self.logger.info("known floodset")
+        self.logger.info(knownFloodSet)
     
         out = np.zeros((2, len(featureDict.keys())))
         for i, pkey in enumerate(sorted(featureDict)):

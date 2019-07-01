@@ -1,2 +1,2 @@
 #!/bin/bash
-python -m unittest discover image_recognition
+nose2 image_recognition test
