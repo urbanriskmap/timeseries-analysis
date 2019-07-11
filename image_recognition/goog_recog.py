@@ -15,6 +15,7 @@ __url__ = "https://github.com/urbanriskmap/timeseries-analysis"
 
 import pickle
 import logging
+from abstract_labeler import AbstractLabeler
 
 from google.api_core.exceptions import GoogleAPICallError
 from google.cloud.vision_v1 import ImageAnnotatorClient
@@ -26,7 +27,7 @@ from sqlalchemy import create_engine
 client = ImageAnnotatorClient()
 
 
-class GoogleLabeler:
+class GoogleLabeler(AbstractLabeler):
     def __init__(self, config):
         self.config = config
 
