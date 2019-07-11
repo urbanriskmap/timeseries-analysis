@@ -108,7 +108,7 @@ class CognicityImageLoaderTest(unittest.TestCase):
         configObj = {
                 "database_engine": ID_ENGINE,
                 "database_name": "cognicity",
-                "location": TEST_LOCATION,
+                "location": NEW_TEST_LOCATION,
                 "img_folder_prefix": IMG_FOLDER_PREFIX,
                 "logger": LOGGER}
 

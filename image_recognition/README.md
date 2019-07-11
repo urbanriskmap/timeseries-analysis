@@ -1,4 +1,3 @@
-
 # Project organization
 img_util.py exists in the parent folder 
 to easily run specific classes (such as goog_recog or aws_recog). 
@@ -8,6 +7,14 @@ images:
 	- Downloads those images into a local folder
 	- Given a pkey: { {label:confidence} } nested Dictionary can create matrix representations
 	- Can create a label matrix given
+
+# Google Cloud Vision API
+Uses the python client library, which 
+requires the GOOGLE_APPLICATION_CREDENTIALS environment variable to be set
+`
+export GOOGLE_APPLICATION_CREDENTIALS=path/to/creds.json
+
+`
 
 # Testing
 In order to run all tests do

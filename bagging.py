@@ -9,7 +9,7 @@ import img_util as img_util
 import simple_nn as nn
 
 import nlp.aws_nlp as aws_nlp
-import nlp_util as nlp_util 
+import nlp_util as nlp_util
 
 import flood_depth.flood_depth as flood_depth
 
