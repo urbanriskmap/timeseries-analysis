@@ -53,3 +53,17 @@ the python virtual environment:
 ```
 ./run_tests
 ```
+
+# Data sources
+Data sources are configured via the config dictionary that is passed
+into every data loader. See default_config.py for an example.
+In general, the cognicity loaders expect the database schema to
+follow: https://github.com/urbanriskmap/cognicity-schema
+and to be clean of test reports.
+A SQL command like this will remove all reports with 'test' in the report
+text, but it will not remove these reports from the grasp table, so beware of
+that (or remove them from the grasp table as well if you like. 
+```
+DELETE FROM riskmap.all_reports WHERE text SIMILAR TO '(%(T|t)(E|e)(S|s)(T|t)%)'
+
+```
