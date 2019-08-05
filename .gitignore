@@ -1,6 +1,7 @@
 _python/
 *__pycache__/
 *.pyc
+*.tsv
 
 #for vim
 *.swp
@@ -15,3 +16,5 @@ _python/
 
 # log files
 *.log
+
+*.ipynb_checkpoints/
