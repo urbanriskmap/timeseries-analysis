@@ -315,3 +315,28 @@ def xval_learning_alg(learner, data, labels, k):
 def eval_classifier(learner, data_train, labels_train, data_test, labels_test):
     th, th0 = learner(data_train, labels_train)
     return score(data_test, labels_test, th, th0)/data_test.shape[1]
+
+
+def random_cross_validate_model(data, labels, learner=perceptron, k=5):
+    full = np.vstack((data, labels)).copy()
+    np.random.shuffle(full.T)
+    data = full[:-1, :]
+    labels = full[-1:, :]
+
+    # axis=1 means columns, split into groups of cols
+    s_data = np.array_split(data, k, axis=1)
+    s_labels = np.array_split(labels, k, axis=1)
+    score_sum = 0
+    for i in range(k):
+        data_train = np.concatenate(s_data[:i] + s_data[i+1:], axis=1)
+        labels_train = np.concatenate(s_labels[:i] + s_labels[i+1:], axis=1)
+        data_test = np.array(s_data[i])
+        labels_test = np.array(s_labels[i])
+        th, th0 = learner(data_train, labels_train, params={
+            "T": 1000,
+            "print": False})
+
+        # number correctly predicted in test set
+        this_score = score(data_test, labels_test, th, th0)
+        score_sum += this_score
+    return (score_sum)/(labels.shape[1]), score_sum

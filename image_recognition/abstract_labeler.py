@@ -23,7 +23,13 @@ import os
 class AbstractLabeler(ABC):
     def __init__(self, config, loader):
         self.config = config
+        self.data_folder_prefix = config["data_folder_prefix"]
         self.loader = loader
+        if not os.path.exists(self.data_folder_prefix):
+            self.logger.debug(
+                "data folder doesn't exist, creating path:",
+                self.data_folder_prefix)
+            os.makedirs(self.data_folder_prefix)
 
     @abstractmethod
     def load_labels_from_disk(self, filename='./abstract_labels.p'):

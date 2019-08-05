@@ -37,12 +37,8 @@ class GoogleLabeler(AbstractLabeler):
         self.data_folder_prefix = configObj["data_folder_prefix"]
         self.logger = configObj["logger"]
 
-        self.logger.debug("GoogleLabeler constructed")
-
-        # make sure that the data folder exists
-        if not os.path.exists(self.data_folder_prefix):
-            os.makedirs(self.data_folder_prefix)
         super().__init__(configObj, loader)
+        self.logger.debug("GoogleLabeler constructed")
 
     def run_labeler(self, filename="goog_labels_default.p"):
         return super().run_labeler(filename)

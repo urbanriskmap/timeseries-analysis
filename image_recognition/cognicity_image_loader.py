@@ -22,7 +22,7 @@ class CognicityImageLoader:
         self.database = configObj["database_engine"]
         self.database_name = configObj["database_name"]
         self.location = configObj["location"]
-        self.img_folder_prefix = configObj["img_folder_prefix"]
+        self.img_folder_prefix = configObj["data_folder_prefix"]
         self.logger = configObj["logger"]
         self.logger.debug("CognicityImageLoader constructed")
 
@@ -49,33 +49,34 @@ class CognicityImageLoader:
                                 index_col="pkey")
         return rows.to_dict()["image_url"]
 
-    def fetch_images(self):
-        def save_image(raw_bytes):
+    def __save_image(self, key, raw_bytes):
+        try:
+            self.logger.debug("Trying to open image")
+            im = Image.open(raw_bytes)
             try:
-                self.logger.debug("Trying to open image")
-                im = Image.open(raw_bytes)
-                try:
-                    folder_path = self.img_folder_prefix + self.location
-                    self.logger.debug("Creating folder: " + folder_path)
-                    os.mkdir(folder_path)
-                except FileExistsError:
-                    self.logger.debug(
-                            "Tried to create an image"
-                            "folder that already existed, continuing")
-                try:
-                    path = folder_path + "/" + str(key) + ".jpeg"
-                    self.logger.debug("image mode: " + im.mode)
-                    im = im.convert("RGB")
-                    im.save(path, "JPEG")
-                except IOError as e:
-                    self.logger.error("IOError: Unable to write file to path: "
-                                      + path + e.strerror)
-                except KeyError:
-                    self.logger.error("KeyError: Unable to write file to path:"
-                                      + path)
+                folder_path = self.img_folder_prefix + self.location
+                self.logger.debug("Creating folder: " + folder_path)
+                os.mkdir(folder_path)
+            except FileExistsError:
+                self.logger.debug(
+                        "Tried to create an image"
+                        "folder that already existed, continuing")
+            try:
+                path = folder_path + "/" + str(key) + ".jpeg"
+                self.logger.debug("image mode: " + im.mode)
+                im = im.convert("RGB")
+                im.save(path, "JPEG")
             except IOError as e:
-                self.logger.error("Unable to open image with url: "
-                                  + each + " " + e.strerror)
+                self.logger.error("IOError: Unable to write file to path: "
+                                  + path + e.strerror)
+            except KeyError:
+                self.logger.error("KeyError: Unable to write file to path:"
+                                  + path)
+        except IOError as e:
+            self.logger.error("Unable to open image with pkey: "
+                              + key + " " + e.strerror)
+
+    def fetch_images(self):
 
         image_urls = self.get_image_urls()
         for key in image_urls.keys():
@@ -84,7 +85,7 @@ class CognicityImageLoader:
             try:
                 r = requests.get(each, stream=True)
                 if r.status_code == 200:
-                    save_image(r.raw)
+                    self.__save_image(key, r.raw)
                 else:
                     self.logger.info("ERROR COULD NOT READ URL: "
                                      + each + " HTTP STATUS CODE: "
