@@ -8,3 +8,4 @@ torch
 numpy
 scipy
 google-cloud-vision
+sklearn
