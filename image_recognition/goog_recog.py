@@ -13,6 +13,7 @@ __email__ = "abrahamq@mit.edu"
 __status__ = "Development"
 __url__ = "https://github.com/urbanriskmap/timeseries-analysis"
 
+import os
 import pickle
 import logging
 from abstract_labeler import AbstractLabeler
@@ -21,25 +22,45 @@ from google.api_core.exceptions import GoogleAPICallError
 from google.cloud.vision_v1 import ImageAnnotatorClient
 
 from cognicity_image_loader import CognicityImageLoader
-
 from sqlalchemy import create_engine
 
 client = ImageAnnotatorClient()
 
 
 class GoogleLabeler(AbstractLabeler):
-    def __init__(self, config):
-        self.config = config
+    def __init__(self, configObj, loader):
+        self.loader = loader
+        self.config = configObj
+        self.database = configObj["database_engine"]
+        self.database_name = configObj["database_name"]
+        self.location = configObj["location"]
+        self.data_folder_prefix = configObj["data_folder_prefix"]
+        self.logger = configObj["logger"]
 
-    def load_labels_from_disk(self, filename='./goog_labels_chennai.p'):
-        return pickle.load(open(filename, 'rb'))
+        self.logger.debug("GoogleLabeler constructed")
 
-    def dump_labels_to_disk(self, labels, filename='./goog_labels_chennai.p'):
-        pickle.dump(labels, open(filename, 'wb'))
+        # make sure that the data folder exists
+        if not os.path.exists(self.data_folder_prefix):
+            os.makedirs(self.data_folder_prefix)
+        super().__init__(configObj, loader)
+
+    def run_labeler(self, filename="goog_labels_default.p"):
+        return super().run_labeler(filename)
+
+    def load_labels_from_disk(self, filename="goog_labels_default.p"):
+        path = os.path.join(self.data_folder_prefix, filename)
+        return pickle.load(open(path, "rb"))
+
+    def dump_labels_to_disk(self, labels, filename="goog_labels_default.p"):
+        path = os.path.join(self.data_folder_prefix, filename)
+        pickle.dump(labels, open(path, "wb"))
         return
 
+    def make_matrix(self, feat_vects):
+        return super().make_matrix(feat_vects)
+
     def make_feature_vectors(self, inp, allowed):
-        '''
+        """
         Args:
             inp:
                 Dictionary of pkeys-> AnnotateImageResponse from google cloud.
@@ -47,11 +68,11 @@ class GoogleLabeler(AbstractLabeler):
                 Dictionary of allowed word to the index in the feature vector
 
                 example: allowed = {
-                                    'Flood':0,
-                                    'Flooding':1,
-                                    'Water':2,
-                                    'Puddle':3,
-                                    'Person':4
+                                    "Flood":0,
+                                    "Flooding":1,
+                                    "Water":2,
+                                    "Puddle":3,
+                                    "Person":4
                                     }
                 would create feature vectors  where the zeroth
                 feature is the confidence score of
@@ -59,19 +80,15 @@ class GoogleLabeler(AbstractLabeler):
         Returns:
             Dictionary{ string Pkey: list{float}}
                 where list is a vector defined by allowed
-        '''
+        """
         # dict of pkeys to feature vectors
         features = dict([(key, [0]*len(allowed.keys())) for key in inp.keys()])
         for pkey in inp.keys():
-            # print(inp[pkey])
-            # print('key: ', pkey)
             labels = inp[pkey].label_annotations
             for entityObject in labels:
                 desc = entityObject.description
                 if desc in allowed:
                     features[pkey][allowed[desc]] = float(entityObject.score)
-            # print('pkey', pkey)
-            # print(features)
         return features
 
     def get_labels(self, image_urls, hook=None):
@@ -80,10 +97,10 @@ class GoogleLabeler(AbstractLabeler):
         for pkey, img_name in image_urls.items():
             try:
                 request = {
-                        'image': {
-                            'source': {'image_uri': img_name},
+                        "image": {
+                            "source": {"image_uri": img_name},
                             },
-                        'features': [
+                        "features": [
                             {
                                 "type": "LABEL_DETECTION",
                                 "max_results": 100
@@ -92,16 +109,36 @@ class GoogleLabeler(AbstractLabeler):
                         }
                 response = client.annotate_image(request)
                 labels[pkey] = response
-                print(response)
 
                 if hook is not None:
-                    print('labeled pkey ', pkey)
-                    print('img url ', img_name)
+                    self.logger.debug("labeled pkey " + str(pkey))
+                    self.logger.debug("img url " + str(img_name))
                     hook(labels)
             except GoogleAPICallError:
-                print('ERROR LABELING PKEY: ', pkey)
-                print('WITH IMG URL: ', img_name)
+                self.logger.debug("ERROR LABELING PKEY: " + str(pkey))
+                self.logger.debug("WITH IMG URL: " + str(img_name))
         return labels
+
+    def make_label_to_index(self, inp):
+        """
+        Args:
+            inp:
+                Dictionary of pkeys -> labelAnnotate resp from google
+        Returns:
+            lab_to_index: dict(string: index)
+            index_to_label: dict(index: string)
+        """
+        all_labels = set()
+        for key, each in inp.items():
+            for lab in each.label_annotations:
+                if lab.description not in all_labels:
+                    all_labels.add(lab.description)
+
+        lab_to_index = dict([(current_label, index) for index, current_label in
+                             enumerate(list(all_labels))])
+        index_to_label = dict([(index, current_label) for index, current_label
+                               in enumerate(list(all_labels))])
+        return lab_to_index, index_to_label
 
 
 if __name__ == "__main__":
@@ -127,7 +164,7 @@ if __name__ == "__main__":
     configObj = {
             "database_engine": ID_ENGINE,
             "database_name": "cognicity",
-            "location": 'id',
+            "location": "id",
             "img_folder_prefix": IMG_FOLDER_PREFIX,
             "logger": LOGGER}
 
@@ -152,4 +189,3 @@ if __name__ == "__main__":
     print(ALL_LABELS)
 
     feat = labeler.make_feature_vectors(labels, ALL_LABELS)
-    print()

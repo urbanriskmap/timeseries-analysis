@@ -251,6 +251,7 @@ def test_with_features(dataFun, order = 2, draw=True):
 # T is a positive integer number of steps to run
 def perceptron(data, labels, params = {}, hook = None):
     T = params.get('T', 10000)
+    should_print = params.get('print', False)
     (d, n) = data.shape
     m = 0
     theta = np.zeros((d, 1)); theta_0 = np.zeros((1, 1))
@@ -263,7 +264,7 @@ def perceptron(data, labels, params = {}, hook = None):
                 theta = theta + y * x
                 theta_0 = theta_0 + y
                 if hook: hook((theta, theta_0))
-        if t%200 ==0: 
+        if should_print and t%200 ==0  : 
             s = score(data, labels, theta, theta_0)/n
             print('T: ', t)
             print('score: ', s)
