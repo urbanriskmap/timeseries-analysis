@@ -47,10 +47,11 @@ def get_all_report_text(en=engine):
     rows = pd.read_sql_query('''
     SELECT pkey, text from riskmap.all_reports
         WHERE text IS NOT null AND LENGTH(text) > 0
-        AND text  NOT SIMILAR To '%%(T|t)(E|e)(S|s)(T|t)%%' 
+        AND text  NOT SIMILAR To '%%(T|t)(E|e)(S|s)(T|t)%%'
         ORDER BY created_at
     ''', con=en, index_col="pkey")
     return rows
+
 
 def get_sentiment(report_text):
     # only valid LanguageCode is 'en' or 'es'

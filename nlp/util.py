@@ -1,46 +1,52 @@
-import pandas as pd
-
-def get_flood_pkeys(start_date, end_date, engine):
-    # gets the pkeys of reports during flood dates
-
-    pkeys = pd.read_sql_query('''
-        SELECT pkey, created_at FROM riskmap.all_reports WHERE
-            created_at > %(start_date)s::timestamptz
-                AND 
-            created_at < %(end_date)s::timestamptz
-    ''', params={"start_date": start_date, "end_date": end_date}, con=engine, index_col="pkey")
-
-    return pkeys
+import numpy as np
 
 
-def get_no_flood_pkeys(start_flood_date, end_flood_date, engine):
-    # gets the pkeys of reports during flood dates
-
-    pkeys = pd.read_sql_query('''
-        SELECT pkey, created_at FROM riskmap.all_reports WHERE
-            created_at < %(start_date)s::timestamptz
-                AND 
-            created_at > %(end_date)s::timestamptz
-    ''', params={"start_date": start_flood_date, "end_date": end_flood_date}, con=engine, index_col="pkey")
-
-    return pkeys
-
-#    num_reports_with_zeros = pd.read_sql_query('''
-#        SELECT date, COALESCE(count, NULL, 0) as count FROM 
-#		(SELECT date_trunc('hour', offs) as date FROM 
-#			generate_series(
-#                            %(start_date)s::timestamptz at time zone 'UTC',
-#                            %(end_date)s::timestamptz at time zone 'UTC',
-#                            %(interval)s::interval
-#			    ) as offs ORDER BY date ASC) empty_hours
-#        LEFT JOIN 
-#                (select date_trunc('hour', created_at), count(pkey) 
-#                   from cognicity.all_reports 
-#                     WHERE text  NOT SIMILAR To '%%(T|t)(E|e)(S|s)(T|t)%%' 
-#                     GROUP BY date_trunc('hour', created_at)
-#                   ) no_test 
-#                   ON date = date_trunc
-#    ''', params={"start_date":start_date, "end_date":end_date, "interval":interval}, con=engine, index_col="date", parse_dates=["date"])
-#
+def prepare_text(self, inp):
+    '''
+    returns a list of strings where each string is a different token
+    '''
+    # TODO replace this with regex?
+    import string
+    exclude = set(string.punctuation)
+    s = "".join(ch for ch in inp if ch not in exclude)
+    return s.lower().replace('\n', ' ').split()
 
 
+def make_feature_matrix(self,
+                        reports_dict,
+                        vocab,
+                        make_vector):
+    """
+    params:
+        report_texts: dictionary from pkeys to text
+        vocab (dict): dictionary from word to index location along the
+                  column vector
+        pos_pkeys (set): membership in this set means the pkey should be
+                         labeled as postive
+        make_vector: a function that takes a vocab and report_text_list and
+                    returns a numpy feature vector
+    Returns:
+        tuple of (feature_matrix, labels)
+        feature_matrix is a matrix of pkeys with associated feature columns
+        underneath
+        pkey      | pkey
+        feat_vect | feat
+        size: (len(vocab)+1, num_reports)
+        labels is a matrix of size (1, num_reports) where report i is +1 if
+            pkey matching that index is in pos_pkeys and -1 else
+    """
+    print(self.config)
+    pos_pkeys = self.config['flood_pkeys']
+    labels = np.zeros((1, (len(reports_dict))))
+    feature_matrix = np.zeros((len(vocab)+1, len(reports_dict)))
+    i = 0
+    for pkey, word_list in reports_dict.items():
+        col = make_vector(vocab, word_list)
+        col_w_pkey = np.insert(col, 0, [pkey], 0)
+        feature_matrix[:, i] = col_w_pkey[:, 0]
+        if pkey in pos_pkeys:
+            labels[0, i] = 1
+        else:
+            labels[0, i] = -1
+        i += 1
+    return (feature_matrix, labels)

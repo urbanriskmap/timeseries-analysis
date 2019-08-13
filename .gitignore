@@ -18,3 +18,5 @@ _python/
 *.log
 
 *.ipynb_checkpoints/
+*.ipynb
+data*

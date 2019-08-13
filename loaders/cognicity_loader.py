@@ -18,17 +18,23 @@ class CognicityLoader:
             configObject(dict)
                 databaseEngine: a sqlalchemy database engine
                 location: a location string, one of "id" or "ch"
-                img_folder_prefix: path for folder to store downloaded images
+                data_folder_prefix: path for folder to store downloaded images
                 logger: a python logging object
         Returns:
             None
         """
+        self.config = configObj
         self.database = configObj["database_engine"]
         self.database_name = configObj["database_name"]
         self.location = configObj["location"]
-        self.img_folder_prefix = configObj["data_folder_prefix"]
+        self.data_folder_prefix = configObj["data_folder_prefix"]
         self.logger = configObj["logger"]
         self.logger.debug("CognicityLoader constructed")
+        if not os.path.exists(self.data_folder_prefix):
+            os.makedirs(self.data_folder_prefix)
+            self.logger.debug(
+                "data folder doesn't exist, created path:" +
+                self.data_folder_prefix)
 
     def get_image_urls(self):
         """
@@ -66,12 +72,35 @@ class CognicityLoader:
         ''', con=self.database, index_col="pkey")
         return rows
 
+    def get_flood_depth(self):
+        pkeys_and_flood_depth = pd.read_sql_query("""
+        SELECT pkey, CAST(report_data ->> 'flood_depth' AS INTEGER)
+            AS flood_depth
+            FROM """ + self.database_name + """.all_reports
+        WHERE report_data->>'flood_depth' IS NOT NULL
+        """, con=self.database, index_col="pkey")
+
+        # make sure all pkeys are in here, else write zero
+        included = pkeys_and_flood_depth.index
+        all_pkeys = pd.Index(self.config["all_pkeys"])
+        # in all pkeys but not in the ones we just queired
+        diff = all_pkeys.difference(included)
+
+        np_zeros = np.array([0]*diff.size)
+        zero_flood_depth = pd.DataFrame(data=np_zeros,
+                                        index=diff,
+                                        columns=["flood_depth"])
+        zero_flood_depth = zero_flood_depth.rename_axis(index="pkey")
+        pkeys_and_flood_depth = pkeys_and_flood_depth.append(zero_flood_depth)
+
+        return pkeys_and_flood_depth
+
     def __save_image(self, key, raw_bytes):
         try:
             self.logger.debug("Trying to open image")
             im = Image.open(raw_bytes)
             try:
-                folder_path = self.img_folder_prefix + self.location
+                folder_path = self.data_folder_prefix + self.location
                 self.logger.debug("Creating folder: " + folder_path)
                 os.mkdir(folder_path)
             except FileExistsError:

@@ -1,14 +1,16 @@
 import numpy as np
+import os
 
-from abstract_labeler import AbstractTextLabeler
+from nlp.abstract_text_labeler import AbstractTextLabeler
 
 
 class BowLabeler(AbstractTextLabeler):
 
     def __init__(self, config, loader):
         self.config = config
+        self.logger = config["logger"]
         self.loader = loader
-        super().__init__(config)
+        super().__init__(config, loader)
 
     def load_labels_from_disk(self, filename='./bow_labels.p'):
         return super().load_labels_from_disk(filename)
@@ -16,21 +18,36 @@ class BowLabeler(AbstractTextLabeler):
     def dump_labels_to_disk(self, labels, filename='./bow_labels.p'):
         return super().dump_labels_to_disk(filename)
 
-    def make_feature_vectors(self, inp, allowed):
+    def make_feature_vectors(self, reports_dict, vocab):
         """
         Args:
-            inp: dict of {pkey: list(str)}
+            reports_dict: dict of {pkey: list(str)}
                 From pkeys to a list of strings where
                 each string is a token found in the text of pkey
-            allowed: dict of {str: int}
+            vocab: dict of {str: int}
                 from token to index in the resulting vector
         Returns:
             feature_vect_dict: dict of {pkey, list(float)}
                 A dictionary where each pkey corresponds to a
                 feature vector for that pkey
         """
+        feature_vect_dict = dict()
 
-        pass
+        flood = self.config["flood_pkeys"]
+        no_flood = self.config["no_flood_pkeys"]
+        remaining_pkeys = flood.union(no_flood)
+
+        for pkey, word_list in reports_dict.items():
+            if pkey in remaining_pkeys:
+                remaining_pkeys.remove(pkey)
+                feature_list = self.make_unary_feature_vector(vocab, word_list)
+                feature_vect_dict[pkey] = feature_list
+
+        zero_list = [0]*len(vocab)
+        for pkey in remaining_pkeys:
+            feature_vect_dict[pkey] = zero_list
+
+        return feature_vect_dict
 
     def get_labels(self, text_df, hook=None):
         """
@@ -40,15 +57,53 @@ class BowLabeler(AbstractTextLabeler):
                 there is at least one column called "text"
                 that has a string.
         Returns:
-            labels: dict of {pkey: list(str)}
+            feat_vector_dict: dict of {pkey: list(str)}
+                where each item is the tokens that are in
+                the report text of each pkey
         """
-        self.loader
-        text_data = self.loader.get_texts()
-        vocab, occur, reports = self.make_unary_vocab(text_data)
-        return reports
+        vocab, occur, feat_vector_dict = self.make_unary_vocab(text_df)
+        self.vocab = vocab
+        return feat_vector_dict
 
-    def make_labels_to_index(self, labels):
-        pass
+    def run_labeler(self, filename="bow_labels_default.p", rerun=False):
+        """
+        loads labels from disk or uses labeler api to labeles images if
+        there are no labels on disk, then saves the labels to disk in
+        config.data_folder_prefix/filename
+        """
+        # TODO: this should be derived from the base class, but
+        #  there's slight differences so there's repeated code
+        # between here and image_recognition/abstract_labeler
+        label_path = os.path.join(self.config["data_folder_prefix"], filename)
+        if rerun or not os.path.exists(label_path):
+            texts_df = self.loader.get_texts()
+            labels = self.get_labels(texts_df, self.dump_labels_to_disk)
+        else:
+            labels = self.load_labels_from_disk(filename)
+        return labels
+
+    def make_label_to_index(self, labels):
+        """
+        Args:
+            Labels dict of (pkey: list(str))
+        Returns:
+            tuple (label_to_index, index_to_label)
+            label_to_index: dict(str: int)
+            index_to_label: dict(int: str)
+        """
+        # TODO: this is super inefficient
+        if not self.vocab:
+            text_df = self.loader.get_texts()
+            vocab, occur, feat_vector_dict = self.make_unary_vocab(text_df)
+            self.vocab = vocab
+            self.logger.info("Should call"
+                             "get_labels before"
+                             "make_labels_to_index")
+        # forwards is vocab,
+        # lets make index_to_label
+        index_to_label = dict([(index, current_label) for current_label, index
+                               in self.vocab.items()])
+        return (self.vocab, index_to_label)
 
     def make_unary_vocab(self, pkey_text_df, offset=0):
         """
@@ -84,10 +139,10 @@ class BowLabeler(AbstractTextLabeler):
         return (vocab, occur, reports_dict)
 
     def make_unary_feature_vector(self, vocab, report_text_list):
-        res = np.zeros((len(vocab), 1))
+        res = [0]*len(vocab)
         for word in report_text_list:
             if word in vocab:
-                res[vocab[word]][0] = 1
+                res[vocab[word]] = 1
             # how to deal with out of vocab words?
         return res
 

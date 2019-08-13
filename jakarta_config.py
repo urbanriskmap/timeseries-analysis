@@ -92,6 +92,7 @@ no_flood_pkeys = __get_no_flood_pkeys(
 config = {
     "flood_pkeys": flood_pkeys,
     "no_flood_pkeys": no_flood_pkeys,
+    "all_pkeys": flood_pkeys.union(no_flood_pkeys),
     "database_engine": engine,
     "database_name": DATABASE,
     "location": "id",
