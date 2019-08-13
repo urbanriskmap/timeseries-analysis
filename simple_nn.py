@@ -17,6 +17,8 @@ class Simple_nn(torch.nn.Module):
 def run_training(model, x_data, y_data):
     lossfn = torch.nn.NLLLoss()
     optimizer = torch.optim.SGD(model.parameters(), lr=0.0015)
+    n = 20
+    last_n = [0]*n
     for epoch in range(20000):
         model.train()
         optimizer.zero_grad()
@@ -25,9 +27,14 @@ def run_training(model, x_data, y_data):
         # Compute Loss
         loss = lossfn(y_pred, y_data)
         print('Loss:', loss)
-        if loss < .04:
+        if epoch > n:
             # early stopping
-            break
+            last_n.pop(0)
+            last_n.append(loss)
+            diff = abs(last_n[-1] - last_n[0])
+            if diff < .0001:
+                print("Early stopping at epoch: " + str(epoch))
+                break
 
         # Backward pass
         loss.backward()

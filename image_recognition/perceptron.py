@@ -276,7 +276,7 @@ def perceptron(data, labels, params = {}, hook = None):
 # labels is dimension 1 by n
 # T is a positive integer number of steps to run
 def perceptron_opt(data, labels, params = {}, hook = None):
-    T = params.get('T', 100)
+    T = params.get('T', 1000)
     (d, n) = data.shape
     m = 0
     theta = np.zeros((d, 1)); theta_0 = np.zeros((1, 1))

@@ -1,6 +1,7 @@
 """
-Reads images from database and fetches labels from aws
-Abraham Quintero, MIT 2018
+Reads images from database and fetches labels from google
+cloud
+Abraham Quintero, MIT 2019
 v0.0.1
 """
 

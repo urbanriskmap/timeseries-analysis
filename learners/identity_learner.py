@@ -1,14 +1,4 @@
-import torch
-import numpy as np
-import pickle
-import os
-
-# import img_util as img_util
-
-import simple_nn as nn
 from learners.abstract_learner import AbstractLearner
-
-# import flood_depth.flood_depth as flood_depth
 
 
 class IdentityLearner(AbstractLearner):
@@ -42,7 +32,7 @@ class IdentityLearner(AbstractLearner):
         """
         Args:
             params dict of (str: obj)
-                passed onto the perceptron function
+                passed onto the ml.perceptron function
                 "T": number of iterations
                 "print": True/False whether to print progress
             validation_keys: set(int)
@@ -76,24 +66,12 @@ class IdentityLearner(AbstractLearner):
         self.val_labels = val_labels
         val_data = val_data_w_pkey[1:, :]
 
-        th, th0 = ml.perceptron(t_data, t_labels, params)
-        self.th = th
-        self.th0 = th0
-
         # get the signed distance for every train data point
-        self.t_sd = np.dot(th.T, t_data) + th0
+        self.t_sd = t_data
         # for every validation data point
-        self.val_sd = np.dot(th.T, val_data) + th0
+        self.val_sd = val_data
 
-        # get the score for this val data
-        correct = ml.score(val_data, val_labels, th, th0)
-        total = val_data.shape[1]
-        percent_correct = correct/total
-        self.logger.info("Num Correct " + str(correct) +
-                         " Out of " + str(total))
-        self.logger.info("Val score: " + str(percent_correct))
-
-        return th, th0
+        return val_data, val_labels
 
     def predict(self, datapoint):
         """
@@ -103,7 +81,4 @@ class IdentityLearner(AbstractLearner):
         Returns:
             signed distance from model
         """
-        if not (self.th and self.th0):
-            self.logger.error("Must call train first!")
-            return None
-        return np.dot(self.th.T, datapoint) + self.th0
+        return datapoint

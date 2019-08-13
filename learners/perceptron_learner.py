@@ -107,7 +107,7 @@ class PerceptronLearner(AbstractLearner):
         """
         Args:
             datapoint (numpy.ndarray)
-                Must have the same length as th
+                Must have the same length as learner.lab_to_index
         Returns:
             signed distance from model
         """

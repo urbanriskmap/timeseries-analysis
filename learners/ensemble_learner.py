@@ -12,7 +12,7 @@ import simple_nn as nn
 
 class EnsembleLearner():
 
-    def __init__(self, config, img_learn, text_learn):
+    def __init__(self, config, names, learners):
         """
         Args:
             learners: list of instances of PerceptronLearners
@@ -20,13 +20,9 @@ class EnsembleLearner():
         self.config = config
         self.data_folder_prefix = config["data_folder_prefix"]
         self.logger = config["logger"]
-        self.img_learn = img_learn
-        self.text_learn = text_learn
-        self.learners = [img_learn, text_learn]
+        self.learners = learners
+        self.names = names
         self.models = []
-        self.names = ["img_model.p", "text_model.p"]
-        # self.learners = [img_learn, text_learn, height_learn]
-        # self.names = ["img_model.p", "text_model.p", "height_model.p"]
         pass
 
     def train(self, params, validation_keys):
