@@ -72,7 +72,7 @@ class CognicityLoader:
         ''', con=self.database, index_col="pkey")
         return rows
 
-    def get_flood_depth(self):
+    def get_flood_depths(self):
         pkeys_and_flood_depth = pd.read_sql_query("""
         SELECT pkey, CAST(report_data ->> 'flood_depth' AS INTEGER)
             AS flood_depth
