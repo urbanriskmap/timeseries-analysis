@@ -317,7 +317,15 @@ def eval_classifier(learner, data_train, labels_train, data_test, labels_test):
     return score(data_test, labels_test, th, th0)/data_test.shape[1]
 
 
-def random_cross_validate_model(data, labels, learner=perceptron, k=5):
+def random_cross_validate_model(data,
+                                labels,
+                                learner=perceptron,
+                                k=5,
+                                params={
+                                    "T": 1000,
+                                    "print": False
+                                    }
+                                ):
     full = np.vstack((data, labels)).copy()
     np.random.shuffle(full.T)
     data = full[:-1, :]
@@ -332,9 +340,7 @@ def random_cross_validate_model(data, labels, learner=perceptron, k=5):
         labels_train = np.concatenate(s_labels[:i] + s_labels[i+1:], axis=1)
         data_test = np.array(s_data[i])
         labels_test = np.array(s_labels[i])
-        th, th0 = learner(data_train, labels_train, params={
-            "T": 1000,
-            "print": False})
+        th, th0 = learner(data_train, labels_train, params=params)
 
         # number correctly predicted in test set
         this_score = score(data_test, labels_test, th, th0)

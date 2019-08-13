@@ -6,8 +6,7 @@ import types
 import numpy as np
 
 from sqlalchemy import create_engine
-
-from cognicity_image_loader import CognicityImageLoader
+from loaders.cognicity_loader import CognicityLoader
 
 IMG_FOLDER_PREFIX = "./test_img_folder_"
 TEST_LOCATION = "id"
@@ -51,10 +50,10 @@ class CognicityImageLoaderTest(unittest.TestCase):
                 "database_engine": ID_ENGINE,
                 "database_name": "cognicity",
                 "location": TEST_LOCATION,
-                "img_folder_prefix": IMG_FOLDER_PREFIX,
+                "data_folder_prefix": IMG_FOLDER_PREFIX,
                 "logger": LOGGER}
 
-        self.loader = CognicityImageLoader(configObj)
+        self.loader = CognicityLoader(configObj)
         self.assertTrue(self.loader)
 
     @unittest.skipIf(os.environ.get("TRAVIS"),
@@ -79,7 +78,7 @@ class CognicityImageLoaderTest(unittest.TestCase):
 
         # replace the get_image_urls function with our mock one
         self.loader.get_image_urls = types.MethodType(mock_get_image_urls,
-                                                      CognicityImageLoader)
+                                                      CognicityLoader)
         self.loader.fetch_images()
 
         # make sure folder gets created
@@ -109,10 +108,10 @@ class CognicityImageLoaderTest(unittest.TestCase):
                 "database_engine": ID_ENGINE,
                 "database_name": "cognicity",
                 "location": NEW_TEST_LOCATION,
-                "img_folder_prefix": IMG_FOLDER_PREFIX,
+                "data_folder_prefix": IMG_FOLDER_PREFIX,
                 "logger": LOGGER}
 
-        mut_loader = CognicityImageLoader(configObj)
+        mut_loader = CognicityLoader(configObj)
 
         # ... let's remove the test folder if it exists
         shutil.rmtree(
@@ -128,7 +127,7 @@ class CognicityImageLoaderTest(unittest.TestCase):
         # replace the get_image_urls function with our mock one
         mut_loader.get_image_urls = types.MethodType(
                     mock_get_image_urls,
-                    CognicityImageLoader)
+                    CognicityLoader)
         mut_loader.fetch_images()
 
         # make sure folder gets created

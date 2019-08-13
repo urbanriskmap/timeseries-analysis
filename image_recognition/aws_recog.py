@@ -29,7 +29,7 @@ import io
 from PIL import Image
 from sqlalchemy import create_engine
 
-from abstract_labeler import AbstractLabeler
+from image_recognition.abstract_labeler import AbstractLabeler
 
 global engine
 DATABASE = "cognicity"
@@ -112,14 +112,30 @@ class AwsLabeler(AbstractLabeler):
             Dictionary{ string Pkey: list{float}}:  where list
                                 is a vector defined by allowed
         """
+        flood = self.config["flood_pkeys"]
+        remaining_pkeys = flood.union(self.config["no_flood_pkeys"])
+
         # dict of pkeys to feature vectors
-        features = dict([(key, [0]*len(allowed.keys())) for key in inp.keys()])
-        for pkey in inp.keys():
-            from_aws = inp[pkey]["Labels"]
-            for tag in from_aws:
-                if tag["Name"] in allowed:
-                    confidence = float(tag["Confidence"])
-                    features[pkey][allowed[tag["Name"]]] = confidence
+        # feat vects are intialized to zero
+        features = dict([(key, [0]*len(allowed.keys())) for key in inp.keys()
+                        if key in remaining_pkeys])
+        for pkey in features.keys():
+            remaining_pkeys.remove(pkey)
+            # if we labeled this one then add it, otherwise let it be zero
+            if pkey in inp:
+                from_aws = inp[pkey]["Labels"]
+                for tag in from_aws:
+                    if tag["Name"] in allowed:
+                        confidence = float(tag["Confidence"])
+                        features[pkey][allowed[tag["Name"]]] = confidence
+
+        # add in zero features that don't have images
+        zero_list = [0]*len(allowed.keys())
+        for pkey in remaining_pkeys:
+            assert(pkey not in features)
+            features[pkey] = zero_list
+
+        self.features = features
         return features
 
     def get_labels(self, image_urls, hook=None):
