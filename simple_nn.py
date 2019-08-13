@@ -1,9 +1,5 @@
 import torch
-from torch.autograd import Variable
-from torch.nn import functional as F
-import numpy as np
 
-import image_recognition.aws_recog as aws
 
 class Simple_nn(torch.nn.Module):
     def __init__(self, dims_in, hidden):
@@ -20,47 +16,22 @@ class Simple_nn(torch.nn.Module):
 
 def run_training(model, x_data, y_data):
     lossfn = torch.nn.NLLLoss()
-    optimizer = torch.optim.SGD(model.parameters(), lr=0.001)
-    for epoch in range(1000):
+    optimizer = torch.optim.SGD(model.parameters(), lr=0.0015)
+    for epoch in range(20000):
         model.train()
         optimizer.zero_grad()
         # Forward pass
         y_pred = model(x_data)
         # Compute Loss
         loss = lossfn(y_pred, y_data)
-        # print('Loss:', loss)
-    
+        print('Loss:', loss)
+        if loss < .04:
+            # early stopping
+            break
+
         # Backward pass
         loss.backward()
+        # limit the size to prevent
+        # exploding gradients
+        torch.nn.utils.clip_grad_norm(model.parameters(), 100)
         optimizer.step()
-
-if __name__ == '__main__':
-    labels = aws.read_labels_from_disk()
-    clean = aws.clean_if_dirty(labels)
-
-    all_labels = set()
-    for key, each in clean.items():
-        for lab in each['Labels']:
-            if lab['Name'] not in all_labels:
-                all_labels.add(lab['Name'])
-        
-    print(len(all_labels))
-
-
-    # allowed has label: index pairs for ex: 'Flood':0, 
-    # so 'Flood' is the first 
-    # in the feature vector 
-    #allowed = dict([ (current_label, index) for index, current_label in enumerate(list(all_labels))])
-    more = ['Flood']
-    allowed = dict([ (current_label, index) for index, current_label in enumerate(list(more))])
-
-    vects = aws.make_feature_vectors(clean, allowed)
-
-    matrix_w_pkey = aws.make_matrix_rep(vects, len(list(allowed)))
-    labels_w_pkey = aws.make_labels_rep(vects)
-
-    matrix = torch.from_numpy(matrix_w_pkey[1:,:].T).float()
-    labels = torch.from_numpy(labels_w_pkey[1:,:].T).float()
-    # matrix = torch.from_numpy(np.vstack((matrix_w_pkey[1:,:], labels_w_pkey[1:,:])).T).float()
-
-    run_training(matrix, labels)
