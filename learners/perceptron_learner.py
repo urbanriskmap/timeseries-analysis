@@ -50,7 +50,8 @@ class PerceptronLearner(AbstractLearner):
 
         self.lab_to_index = lab_to_index
         self.index_to_lab = index_to_lab
-        feat = self.labeler.make_feature_vectors(labels, lab_to_index)
+        feat = self.labeler.make_feature_vectors(labels, lab_to_index,
+                                                 include_zero_vects=False)
         training_feat = dict()
         validation_feat = dict()
         for key, val in feat.items():
@@ -88,20 +89,6 @@ class PerceptronLearner(AbstractLearner):
         self.logger.info("Val score: " + str(percent_correct))
 
         return th, th0
-
-    # def run_learner(self,
-    #                 filename,
-    #                 rerun=False,
-    #                 validation_keys=dict(),
-    #                 params={"T": 1000, "print": True}):
-    #     path = os.path.join(self.data_folder_prefix, filename)
-    #     if rerun or not os.path.exists(path):
-    #         th, th0 = self.train(params, validation_keys=validation_keys)
-    #         self.dump_model_to_disk((th, th0), filename)
-    #         return th, th0
-    #     else:
-    #         th, th0 = self.load_model_from_disk(filename)
-    #     return th, th0
 
     def predict(self, datapoint):
         """

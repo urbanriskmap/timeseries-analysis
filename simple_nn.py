@@ -10,16 +10,16 @@ class Simple_nn(torch.nn.Module):
 
     def forward(self, x):
         hidden_activation = self.linear1(x).clamp(min=0)
-        y_pred = self.linear2(hidden_activation)
+        y_pred = self.linear2(hidden_activation).clamp(min=0)
         return self.output(y_pred)
 
 
-def run_training(model, x_data, y_data):
+def run_training(model, x_data, y_data, num_epochs=10000):
     lossfn = torch.nn.NLLLoss()
     optimizer = torch.optim.SGD(model.parameters(), lr=0.0015)
     n = 20
     last_n = [0]*n
-    for epoch in range(20000):
+    for epoch in range(num_epochs):
         model.train()
         optimizer.zero_grad()
         # Forward pass

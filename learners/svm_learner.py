@@ -49,7 +49,8 @@ class SvmLearner(AbstractLearner):
 
         self.lab_to_index = lab_to_index
         self.index_to_lab = index_to_lab
-        feat = self.labeler.make_feature_vectors(labels, lab_to_index)
+        feat = self.labeler.make_feature_vectors(labels, lab_to_index,
+                                                 include_zero_vects=False)
         training_feat = dict()
         validation_feat = dict()
         for key, val in feat.items():

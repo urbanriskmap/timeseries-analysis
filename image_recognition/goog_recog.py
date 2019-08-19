@@ -53,7 +53,7 @@ class GoogleLabeler(AbstractLabeler):
     def make_matrix(self, feat_vects):
         return super().make_matrix(feat_vects)
 
-    def make_feature_vectors(self, inp, allowed):
+    def make_feature_vectors(self, inp, allowed, include_zero_vects=True):
         """
         Args:
             inp:
@@ -93,10 +93,11 @@ class GoogleLabeler(AbstractLabeler):
                         features[pkey][allowed[desc]] =\
                                         float(entityObject.score)
         # add in zero features that don't have images
-        zero_list = [0]*len(allowed.keys())
-        for pkey in all_selected_pkeys:
-            assert(pkey not in features)
-            features[pkey] = zero_list
+        if include_zero_vects:
+            zero_list = [0]*len(allowed.keys())
+            for pkey in all_selected_pkeys:
+                assert(pkey not in features)
+                features[pkey] = zero_list
 
         self.features = features
         return features
@@ -158,53 +159,3 @@ class GoogleLabeler(AbstractLabeler):
         index_to_label = dict([(index, current_label) for index, current_label
                                in enumerate(list(all_labels))])
         return lab_to_index, index_to_label
-
-
-# if __name__ == "__main__":
-#     LOGGER = logging.getLogger()
-#     LOGGER.setLevel(logging.DEBUG)
-#     formatter = logging.Formatter(
-#                 "%(asctime)s - %(levelname)s - %(message)s")
-#     TEST_LOG_FILENAME = "test_log_filename.log"
-#     fh = logging.FileHandler(TEST_LOG_FILENAME)
-#     fh.setLevel(logging.DEBUG)
-#     fh.setFormatter(formatter)
-#     LOGGER.addHandler(fh)
-#     ch = logging.StreamHandler()
-#     ch.setLevel(logging.DEBUG)
-#     ch.setFormatter(formatter)
-#     LOGGER.addHandler(ch)
-#     DATABASE = "cognicity"
-#     ID_ENGINE = create_engine(
-#                 "postgresql://postgres:postgres@localhost:5432/"
-#                 + DATABASE)
-#     IMG_FOLDER_PREFIX = "100_labels_goog"
-#     configObj = {
-#             "database_engine": ID_ENGINE,
-#             "database_name": "cognicity",
-#             "location": "id",
-#             "img_folder_prefix": IMG_FOLDER_PREFIX,
-#             "logger": LOGGER}
-#
-#     loader = CognicityImageLoader(configObj)
-#     img_urls = loader.get_image_urls()
-#
-#     config = {}
-#     labeler = GoogleLabeler(config)
-#     labels = labeler.get_labels(img_urls, hook=labeler.dump_labels_to_disk)
-#
-#     # labels = labeler.load_labels_from_disk()
-#
-#     all_labels = set()
-#     for key, each in labels.items():
-#         for lab in each.label_annotations:
-#             if lab.description not in all_labels:
-#                 all_labels.add(lab.description)
-#
-#     ALL_LABELS = dict([(current_label, index)
-#                       for index, current_label
-#                       in enumerate(list(all_labels))])
-#     print(len(ALL_LABELS))
-#     print(ALL_LABELS)
-#
-#     feat = labeler.make_feature_vectors(labels, ALL_LABELS)

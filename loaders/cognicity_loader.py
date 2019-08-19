@@ -35,6 +35,13 @@ class CognicityLoader:
             self.logger.debug(
                 "data folder doesn't exist, created path:" +
                 self.data_folder_prefix)
+        # make the img directory as well
+
+        folder_path = os.path.join(self.data_folder_prefix, self.location)
+        self.image_path = folder_path
+        if not os.path.exists(self.image_path):
+                self.logger.debug("Creating img folder: " + folder_path)
+                os.mkdir(self.image_path)
 
     def get_image_urls(self):
         """
@@ -96,20 +103,16 @@ class CognicityLoader:
         return pkeys_and_flood_depth
 
     def __save_image(self, key, raw_bytes):
+        print("KEEEEY ", key)
         try:
             self.logger.debug("Trying to open image")
             im = Image.open(raw_bytes)
+
             try:
-                folder_path = os.path.join(self.data_folder_prefix, self.location)
-                self.logger.debug("Creating img folder: " + folder_path)
-                os.mkdir(folder_path)
-            except FileExistsError:
-                self.logger.debug(
-                        "Tried to create an image"
-                        "folder that already existed, continuing")
-            try:
-                path = folder_path + "/" + str(key) + ".jpeg"
-                self.logger.debug("image mode: " + im.mode)
+                path = os.path.join(self.image_path, str(key) + ".jpeg")
+                self.logger.info("saving image to path "
+                                  + path + " pkey: " + str(key))
+                self.logger.info("image mode: " + im.mode)
                 im = im.convert("RGB")
                 im.save(path, "JPEG")
             except IOError as e:
@@ -119,6 +122,7 @@ class CognicityLoader:
                 self.logger.error("KeyError: Unable to write file to path:"
                                   + path)
         except IOError as e:
+            print(e)
             self.logger.error("Unable to open image with pkey: "
                               + str(key) + " " + e.strerror)
 
@@ -131,7 +135,9 @@ class CognicityLoader:
             try:
                 r = requests.get(each, stream=True)
                 if r.status_code == 200:
-                    self.__save_image(key, r.raw)
+                    import io
+                    raw_bytes = io.BytesIO(r.content)
+                    self.__save_image(key, raw_bytes)
                 else:
                     self.logger.info("ERROR COULD NOT READ URL: "
                                      + str(each) + " HTTP STATUS CODE: "
