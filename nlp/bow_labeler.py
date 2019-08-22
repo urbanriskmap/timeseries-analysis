@@ -18,7 +18,8 @@ class BowLabeler(AbstractTextLabeler):
     def dump_labels_to_disk(self, labels, filename='./bow_labels.p'):
         return super().dump_labels_to_disk(filename)
 
-    def make_feature_vectors(self, reports_dict, vocab):
+    def make_feature_vectors(self, reports_dict, vocab,
+                             include_zero_vects=True):
         """
         Args:
             reports_dict: dict of {pkey: list(str)}
@@ -43,9 +44,10 @@ class BowLabeler(AbstractTextLabeler):
                 feature_list = self.make_unary_feature_vector(vocab, word_list)
                 feature_vect_dict[pkey] = feature_list
 
-        zero_list = [0]*len(vocab)
-        for pkey in remaining_pkeys:
-            feature_vect_dict[pkey] = zero_list
+        if include_zero_vects:
+            zero_list = [0]*len(vocab)
+            for pkey in remaining_pkeys:
+                feature_vect_dict[pkey] = zero_list
 
         return feature_vect_dict
 

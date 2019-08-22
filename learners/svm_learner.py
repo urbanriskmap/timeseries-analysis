@@ -64,7 +64,8 @@ class SvmLearner(AbstractLearner):
         self.t_labels = t_labels
         t_data = t_data_w_pkey[1:, :]
 
-        self.clf = svm.SVC(gamma="scale", kernel="poly")
+        # found best hyper params by exhaustive grid search in svm_test.ipynb
+        self.clf = svm.SVC(gamma="scale", kernel="rbf", degree=3)
         # sklearn expects rows to be data points, we've gone with columns
         self.clf.fit(t_data.T, self.t_labels[0, :])
 
@@ -85,6 +86,13 @@ class SvmLearner(AbstractLearner):
         self.logger.info("Val score: " + str(percent_correct))
 
         # get the signed distance for every train data point
+        # with the pkey as the first row
+        # self.t_sd = np.vstack((self.t_data_w_pkey[0, :],
+        #                       self.clf.decision_function(t_data.T)))
+        # # for every validation data point
+        # self.val_sd = np.vstack((self.val_data_w_pkey[0, :],
+        #                         self.clf.decision_function(val_data.T)))
+
         self.t_sd = self.clf.decision_function(t_data.T)
         # for every validation data point
         self.val_sd = self.clf.decision_function(val_data.T)
