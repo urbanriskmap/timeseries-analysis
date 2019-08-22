@@ -4,7 +4,6 @@ import pickle
 import os
 import pandas as pd
 
-# import img_util as img_util
 
 import simple_nn as nn
 
@@ -13,7 +12,7 @@ import simple_nn as nn
 
 class EnsembleLearner():
 
-    def __init__(self, config, names, learners):
+    def __init__(self, config, names, learners, hidden=10):
         """
         Args:
             learners: list of instances of PerceptronLearners
@@ -23,6 +22,7 @@ class EnsembleLearner():
         self.logger = config["logger"]
         self.learners = learners
         self.names = names
+        self.hidden = hidden
         self.models = []
         pass
 
@@ -58,6 +58,23 @@ class EnsembleLearner():
             lab_df.update(labs)
             print(res)
         return res.join(lab_df)
+
+    def fit(self, X, y):
+        """
+        Args:
+            X (np.array) of [n_samples, n_features]
+            y (np.array) of [n_samples]
+                where each member is -1 or +1
+        Returns:
+            self (object)
+        """
+        t_full_matrix = torch.from_numpy(X).float()
+        # sklearn wants -1, 1 class labels but torch expects 0, 1
+        into_zeros = np.where(y < 0, 0, 1)
+        t_full_labels = torch.from_numpy(into_zeros).long()
+        self.nn_model = nn.Simple_nn(X.shape[0], self.hidden)
+        nn.run_training(self.nn_model, t_full_matrix, t_full_labels)
+        return self
 
     def train(self, params, validation_keys):
         """
@@ -116,8 +133,9 @@ class EnsembleLearner():
         into_zeros = np.where(self.t_labels < 0, 0, 1)
         t_full_labels = torch.from_numpy(into_zeros).long()
 
-        hidden_layers = params["hidden"]
-        nn_model = nn.Simple_nn(len(self.models), hidden_layers)
+        self.hidden_layers = params["hidden"]
+        nn_model = nn.Simple_nn(len(self.models), self.hidden_layers)
+        self.nn_model = nn_model
         # nn_model = nn.Simple_nn(len(self.models), hidden_layers)
         nn.run_training(nn_model, t_full_matrix, t_full_labels)
 
@@ -144,6 +162,17 @@ class EnsembleLearner():
         self.logger.debug("dumping model to: " + str(path))
         pickle.dump(model, open(path, "wb"))
         return
+
+    def predict(self, datapoint):
+        import math
+        logSoftmaxOutput = self.nn_model(datapoint)
+        probs = math.e**logSoftmaxOutput
+        p = probs.data.numpy()
+
+        predicted = np.argmax(p, axis=1)  # which index is greater
+        # now from index to -1, 1
+        to_class_label = np.where(predicted == 0, -1, 1)
+        return to_class_label
 
     def load_model_from_disk(self, filename="perceptron_default.p"):
         path = os.path.join(self.data_folder_prefix, filename)

@@ -111,3 +111,39 @@ class SvmLearner(AbstractLearner):
             self.logger.warn("Should have called train first!")
             return
         return self.clf.predict(datapoint)
+
+    def cross_validate_model(self,
+                             data,
+                             labels,
+                             k=5,
+                             params={
+                                 "T": 1000,
+                                 "print": False
+                                 }
+                             ):
+        """
+        Rnadomly shuffles data and labels into
+        k many groups. Trains on k-1 and then test
+        on left out group.
+        Args:
+            data (np.ndarray)
+            labels (np.ndarray)
+            k (int)
+                How many ways to split the data
+        Returns:
+            (mean, std): tuple of floats
+                the mean and standard deviation
+                of cross validation.
+        """
+        if not self.clf:
+            self.logger.error("Called cross validate"
+                              "before training in"
+                              "SvmLearner!")
+            return
+        from sklearn.model_selection import cross_val_score
+        from sklearn.model_selection import ShuffleSplit
+        # make sure to shuffle the data!
+        cv = ShuffleSplit(n_splits=k, test_size=.10)
+        scores = cross_val_score(self.clf, data, labels, cv=cv)
+        self.scores = scores
+        return (scores.mean(), scores.std())
