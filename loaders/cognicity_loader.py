@@ -40,8 +40,8 @@ class CognicityLoader:
         folder_path = os.path.join(self.data_folder_prefix, self.location)
         self.image_path = folder_path
         if not os.path.exists(self.image_path):
-                self.logger.debug("Creating img folder: " + folder_path)
-                os.mkdir(self.image_path)
+            self.logger.debug("Creating img folder: " + folder_path)
+            os.mkdir(self.image_path)
 
     def get_image_urls(self):
         """
@@ -111,7 +111,7 @@ class CognicityLoader:
             try:
                 path = os.path.join(self.image_path, str(key) + ".jpeg")
                 self.logger.info("saving image to path "
-                                  + path + " pkey: " + str(key))
+                                 + path + " pkey: " + str(key))
                 self.logger.info("image mode: " + im.mode)
                 im = im.convert("RGB")
                 im.save(path, "JPEG")
