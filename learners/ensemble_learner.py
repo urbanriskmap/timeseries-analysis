@@ -2,6 +2,7 @@ import torch
 import numpy as np
 import pickle
 import os
+import pandas as pd
 
 # import img_util as img_util
 
@@ -25,6 +26,39 @@ class EnsembleLearner():
         self.models = []
         pass
 
+    def _fill_no_data_spots(self, data_list, label_list):
+        """
+        Places zeros where data is missing
+        Args:
+            data_list: list of ndarrays where the first row is
+                pkeys and the second row is a float datapoint
+            labels: ndarray of labels
+        Returns:
+            pd.DataFrame:
+        """
+        all_pkeys = set()
+        for each in data_list:
+            all_pkeys.update(each[0, :].tolist())
+        res = pd.DataFrame(all_pkeys,
+                           columns=["pkey"]).set_index("pkey",
+                                                       drop=True).sort_index()
+        last_index = 0
+        lab_df = pd.DataFrame(all_pkeys,
+                              columns=["pkey"]).set_index("pkey",
+                                                          drop=True).sort_index()
+        lab_df["label"] = 0
+        for i, (data, labels) in enumerate(zip(data_list, label_list)):
+            vect_len = data.shape[0]-1
+            # pkeys should be index in the first row of data
+            ind = pd.Index(data[0, :], name="pkey")
+            add_df = pd.DataFrame(data=data[1:, :].T, index=ind, columns=range( last_index, last_index+vect_len))
+            last_index += vect_len
+            res = pd.concat([res, add_df], axis=1).fillna(0)
+            labs = pd.DataFrame(data=labels.T, columns=["label"], index=ind)
+            lab_df.update(labs)
+            print(res)
+        return res.join(lab_df)
+
     def train(self, params, validation_keys):
         """
         Runs all learners
@@ -39,32 +73,52 @@ class EnsembleLearner():
         # run all the learners
         train_sd = []
         val_sd = []
-        t_labels = []
+        t_labels_list = []
+        val_labels_list = []
         self.val_labels = []
         for name, each in zip(self.names, self.learners):
             model = each.run_learner(name,
-                                     rerun=True,
+                                     rerun=False,
                                      validation_keys=validation_keys,
                                      params=params)
             self.models.append(model)
-            train_sd.append(each.t_sd)
-            val_sd.append(each.val_sd)
-            t_labels = each.t_labels
-            self.val_labels = each.val_labels
+
+            t_sd_w_pkey = np.vstack((each.t_data_w_pkey[0, :],
+                                    each.t_sd))
+            train_sd.append(t_sd_w_pkey)
+            t_labels_list.append(each.t_labels)
+
+            val_sd_w_pkey = np.vstack((each.val_data_w_pkey[0, :],
+                                      each.val_sd))
+            val_sd.append(val_sd_w_pkey)
+            val_labels_list.append(each.val_labels)
 
         # arrange a matrix st each column is the
         # result of predicting on this pkey
         # ex: the signed distance from the separator
-        train_matrix = np.vstack(train_sd)
-        val_matrix = np.vstack(val_sd)
+        train_matrix = self._fill_no_data_spots(train_sd,
+                                                t_labels_list).to_numpy().T
+        self.train_matrix = train_matrix
+        self.t_labels = train_matrix[-1, :]
+        train_matrix = train_matrix[:-1, :]  # remove label
+        self.logger.info("training size " + str(train_matrix.shape))
+        self.logger.info("training matrix " + str(self.train_matrix))
+
+        val_pd = self._fill_no_data_spots(val_sd, val_labels_list)
+        val_matrix = val_pd.loc[pd.Index(validation_keys)].to_numpy().T
+        self.val_matrix = val_matrix
+        self.val_labels = val_matrix[-1, :]
+        val_matrix = val_matrix[:-1, :]  # remove label
+        self.logger.info("validation size " + str(val_matrix.shape))
 
         t_full_matrix = torch.from_numpy(train_matrix.T).float()
         # no flood is zero class, flood is 1st class
-        into_zeros = np.where(t_labels < 0, 0, 1)[0, :]
+        into_zeros = np.where(self.t_labels < 0, 0, 1)
         t_full_labels = torch.from_numpy(into_zeros).long()
 
         hidden_layers = params["hidden"]
         nn_model = nn.Simple_nn(len(self.models), hidden_layers)
+        # nn_model = nn.Simple_nn(len(self.models), hidden_layers)
         nn.run_training(nn_model, t_full_matrix, t_full_labels)
 
         torch_val_matrix = torch.from_numpy(val_matrix.T).float()
