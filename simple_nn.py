@@ -31,7 +31,7 @@ class Complex_nn(torch.nn.Module):
         return x
 
 
-def run_training(model, x_data, y_data, num_epochs=10000):
+def run_training(model, x_data, y_data, num_epochs=20000):
     lossfn = torch.nn.NLLLoss()
     optimizer = torch.optim.SGD(model.parameters(), lr=0.0015)
     n = 20
@@ -43,7 +43,9 @@ def run_training(model, x_data, y_data, num_epochs=10000):
         y_pred = model(x_data)
         # Compute Loss
         loss = lossfn(y_pred, y_data)
-        print('Loss:', loss)
+        if epoch % 500 == 0:
+            print('Epoch:', epoch)
+            print('Loss:', loss)
         if epoch > n:
             # early stopping
             last_n.pop(0)

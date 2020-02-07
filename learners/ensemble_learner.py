@@ -9,21 +9,27 @@ import simple_nn as nn
 
 # import flood_depth.flood_depth as flood_depth
 
+from sklearn.base import BaseEstimator
 
-class EnsembleLearner():
+
+class EnsembleLearner(BaseEstimator):
 
     def __init__(self, config, names, learners, hidden=10):
         """
         Args:
             learners: list of instances of PerceptronLearners
         """
-        self.config = config
+        # self.config = config
         self.data_folder_prefix = config["data_folder_prefix"]
-        self.logger = config["logger"]
+        # self.logger = config["logger"]
         self.learners = learners
         self.names = names
         self.hidden = hidden
         self.models = []
+
+        self.flood = config["flood_pkeys"]
+        self.no_flood = config["no_flood_pkeys"]
+        self.all_pkeys = self.flood.union(self.no_flood)
         pass
 
     def _fill_no_data_spots(self, data_list, label_list):
@@ -56,8 +62,7 @@ class EnsembleLearner():
             res = pd.concat([res, add_df], axis=1).fillna(0)
             labs = pd.DataFrame(data=labels.T, columns=["label"], index=ind)
             lab_df.update(labs)
-            print(res)
-        return res.join(lab_df)
+        return res.join(lab_df).fillna(0)
 
     def fit(self, X, y):
         """
@@ -72,7 +77,7 @@ class EnsembleLearner():
         # sklearn wants -1, 1 class labels but torch expects 0, 1
         into_zeros = np.where(y < 0, 0, 1)
         t_full_labels = torch.from_numpy(into_zeros).long()
-        self.nn_model = nn.Simple_nn(X.shape[0], self.hidden)
+        self.nn_model = nn.Simple_nn(X.shape[1], self.hidden)
         nn.run_training(self.nn_model, t_full_matrix, t_full_labels)
         return self
 
@@ -81,10 +86,7 @@ class EnsembleLearner():
         Runs all learners
 
         """
-        flood = self.config["flood_pkeys"]
-        no_flood = self.config["no_flood_pkeys"]
-        all_pkeys = flood.union(no_flood)
-
+        all_pkeys = self.flood.union(self.no_flood)
         assert(validation_keys.issubset(all_pkeys))
 
         # run all the learners
@@ -113,35 +115,36 @@ class EnsembleLearner():
         # arrange a matrix st each column is the
         # result of predicting on this pkey
         # ex: the signed distance from the separator
-        train_matrix = self._fill_no_data_spots(train_sd,
-                                                t_labels_list).to_numpy().T
-        self.train_matrix = train_matrix
-        self.t_labels = train_matrix[-1, :]
-        train_matrix = train_matrix[:-1, :]  # remove label
-        self.logger.info("training size " + str(train_matrix.shape))
-        self.logger.info("training matrix " + str(self.train_matrix))
+        self.train_pd = self._fill_no_data_spots(train_sd,
+                                                 t_labels_list)
+        t_with_labels = self.train_pd.to_numpy().T
+        self.t_labels = t_with_labels[-1, :]
+        self.train_matrix = t_with_labels[:-1, :]  # remove label
+        # self.logger.info("training size " + str(self.train_matrix.shape))
+        # self.logger.info("training matrix " + str(self.train_matrix))
 
-        val_pd = self._fill_no_data_spots(val_sd, val_labels_list)
-        val_matrix = val_pd.loc[pd.Index(validation_keys)].to_numpy().T
-        self.val_matrix = val_matrix
-        self.val_labels = val_matrix[-1, :]
-        val_matrix = val_matrix[:-1, :]  # remove label
-        self.logger.info("validation size " + str(val_matrix.shape))
-
-        t_full_matrix = torch.from_numpy(train_matrix.T).float()
-        # no flood is zero class, flood is 1st class
-        into_zeros = np.where(self.t_labels < 0, 0, 1)
-        t_full_labels = torch.from_numpy(into_zeros).long()
+        self.val_pd = self._fill_no_data_spots(val_sd, val_labels_list)
+        val_w_labels = self.val_pd.loc[pd.Index(validation_keys)].to_numpy().T
+        # take out the labels
+        self.val_labels = val_w_labels[-1, :]
+        self.val_matrix = val_w_labels[:-1, :]
+        # self.logger.info("validation size " + str(self.val_matrix.shape))
 
         self.hidden_layers = params["hidden"]
-        nn_model = nn.Simple_nn(len(self.models), self.hidden_layers)
-        self.nn_model = nn_model
-        # nn_model = nn.Simple_nn(len(self.models), hidden_layers)
-        nn.run_training(nn_model, t_full_matrix, t_full_labels)
 
-        torch_val_matrix = torch.from_numpy(val_matrix.T).float()
-        self.res = nn_model(torch_val_matrix)
-        return nn_model
+        self.fit(self.train_matrix.T, self.t_labels)
+#         t_full_matrix = torch.from_numpy(train_matrix.T).float()
+#         # no flood is zero class, flood is 1st class
+#         into_zeros = np.where(self.t_labels < 0, 0, 1)
+#         t_full_labels = torch.from_numpy(into_zeros).long()
+#         nn_model = nn.Simple_nn(len(self.models), self.hidden_layers)
+#         self.nn_model = nn_model
+#         # nn_model = nn.Simple_nn(len(self.models), hidden_layers)
+#         nn.run_training(nn_model, t_full_matrix, t_full_labels)
+
+        torch_val_matrix = torch.from_numpy(self.val_matrix.T).float()
+        self.res = self.nn_model(torch_val_matrix)
+        return self.nn_model
 
     def run_learner(self,
                     filename,
@@ -159,11 +162,20 @@ class EnsembleLearner():
 
     def dump_model_to_disk(self, model, filename="ensemble_learner_default.p"):
         path = os.path.join(self.data_folder_prefix, filename)
-        self.logger.debug("dumping model to: " + str(path))
+        # self.logger.debug("dumping model to: " + str(path))
         pickle.dump(model, open(path, "wb"))
         return
 
-    def predict(self, datapoint):
+    def predict(self, X):
+        """
+        Args:
+            X: (ndarray) of [n_samples, n_features]
+
+        Returns:
+            y:
+                +1, -1 label
+        """
+        datapoint = torch.from_numpy(X).float()
         import math
         logSoftmaxOutput = self.nn_model(datapoint)
         probs = math.e**logSoftmaxOutput
@@ -176,5 +188,5 @@ class EnsembleLearner():
 
     def load_model_from_disk(self, filename="perceptron_default.p"):
         path = os.path.join(self.data_folder_prefix, filename)
-        self.logger.debug("loading from: " + str(path))
+        # self.logger.debug("loading from: " + str(path))
         return pickle.load(open(path, "rb"))
