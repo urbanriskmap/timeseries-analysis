@@ -28,9 +28,11 @@ sudo apt-get install imagemagick
 
 For jupyter notebooks first register the virtual env then run
 ```
-python -m ipykernel install --user --name=_python
+source _python/bin/activate
+python -m ipykernel install --user --name=time_series
 jupyter notebook
 ```
+Then make sure that you're using the time_series virtual environment.
 
 If you want vim keybindings then use the jupyter-vim-binding plugin:
 ```
@@ -43,6 +45,25 @@ git clone https://github.com/lambdalisue/jupyter-vim-binding vim_binding
 jupyter nbextension enable vim_binding/vim_binding
 
 ```
+
+## Google
+If you'd like to run the google cloud vision labeling code, you must
+first create a [google cloud project](https://cloud.google.com/vision)
+and download credentials as json.
+
+In order to set google credentials, set the path to credentials in the
+GOOGLE_APPLICATION_CREDENTIALS env var:
+```
+export GOOGLE_APPLICATION_CREDENTIALS=<path to creds>
+```
+
+## AWS:
+For an IAM user with access to Rekognition is needed then set
+```
+AWS_ACCESS_KEY_ID=
+AWS_SECRET_ACCESS_KEY=
+```
+
 
 
 # Testing

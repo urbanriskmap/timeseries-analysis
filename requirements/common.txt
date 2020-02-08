@@ -9,3 +9,4 @@ numpy
 scipy
 google-cloud-vision
 sklearn
+ipykernel
