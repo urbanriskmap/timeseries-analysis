@@ -1,3 +1,4 @@
+cython
 wheel
 pycodestyle
 coverage==4.4.2
